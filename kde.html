@@ -1,0 +1,2083 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kernel Density Estimation Explorer</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Add MathJax for LaTeX rendering -->
+    <script
+      type="text/javascript"
+      id="MathJax-script"
+      async
+      src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+    ></script>
+    <style>
+      :root {
+        --background-color: #f9f9fb;
+        --text-color: #2b2d42;
+        --card-bg: #ffffff;
+        --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        --accent-color: #4361ee;
+        --secondary-accent: #3f37c9;
+        --border-color: #e0e0e0;
+        --chart-grid: #e9ecef;
+        --histogram-color: #4361ee;
+        --kde-color: #ef476f;
+        --kde-fill: rgba(239, 71, 111, 0.2);
+        --input-bg: #ffffff;
+        --button-hover: #3a56d4;
+        --card-radius: 12px;
+        --success-color: #06d6a0;
+        --error-color: #d90429;
+        --warning-color: #ffd166;
+      }
+
+      /* Dark Mode Variables */
+      .dark-mode {
+        --background-color: #1a1b25;
+        --text-color: #f8f9fa;
+        --card-bg: #2b2d42;
+        --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.24);
+        --accent-color: #4895ef;
+        --secondary-accent: #4cc9f0;
+        --border-color: #4b4b6a;
+        --chart-grid: #3c3d54;
+        --histogram-color: #4895ef;
+        --kde-color: #ff5e78;
+        --kde-fill: rgba(255, 94, 120, 0.2);
+        --input-bg: #242535;
+        --button-hover: #3a75b0;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+          Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--background-color);
+        color: var(--text-color);
+        line-height: 1.6;
+        transition: background-color 0.3s ease, color 0.3s ease;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 32px;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 16px;
+      }
+
+      .app-title {
+        font-size: 28px;
+        font-weight: 700;
+        margin: 0;
+        color: var(--accent-color);
+      }
+
+      .header-controls {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .dark-mode-toggle {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+      }
+
+      .dark-mode-toggle:hover {
+        transform: rotate(30deg);
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 20px;
+      }
+
+      .nav-link {
+        color: var(--accent-color);
+        text-decoration: none;
+        transition: color 0.3s;
+        font-weight: 500;
+      }
+
+      .nav-link:hover {
+        color: var(--secondary-accent);
+      }
+
+      .main-content {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 32px;
+      }
+
+      @media (max-width: 1100px) {
+        .main-content {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .visualization-column,
+      .theory-column {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .card {
+        background-color: var(--card-bg);
+        border-radius: var(--card-radius);
+        box-shadow: var(--card-shadow);
+        padding: 24px;
+        transition: box-shadow 0.3s ease;
+      }
+
+      .card:hover {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      }
+
+      .card h2 {
+        margin-top: 0;
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--accent-color);
+      }
+
+      .card h3 {
+        margin-top: 16px;
+        margin-bottom: 8px;
+        font-size: 18px;
+        font-weight: 500;
+      }
+
+      .svg-container {
+        width: 100%;
+        height: 400px;
+        margin-top: 16px;
+      }
+
+      .control-row {
+        display: flex;
+        flex-direction: row; /* Ensure horizontal layout */
+        align-items: flex-start; /* Changed from align-items: center to fix overlap */
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .input-group {
+        flex-grow: 1;
+        width: calc(100% - 150px); /* Ensure space for the button */
+      }
+
+      label {
+        font-weight: 500;
+        display: block;
+        margin-bottom: 8px;
+      }
+
+      textarea,
+      input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background-color: var(--input-bg);
+        color: var(--text-color);
+        font-family: monospace;
+        font-size: 14px;
+        transition: border-color 0.3s;
+      }
+
+      textarea {
+        resize: vertical; /* Only allow vertical resizing */
+      }
+
+      textarea:focus,
+      input:focus {
+        outline: none;
+        border-color: var(--accent-color);
+      }
+
+      .slider-container {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .slider-with-value {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .slider-with-value input {
+        flex-grow: 1;
+      }
+
+      .slider-value {
+        font-family: monospace;
+        min-width: 40px;
+        text-align: right;
+      }
+
+      button {
+        background-color: var(--accent-color);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 10px 16px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: background-color 0.3s;
+      }
+
+      button:hover {
+        background-color: var(--button-hover);
+      }
+
+      .data-button {
+        white-space: nowrap;
+        align-self: flex-end; /* Add this to align button with bottom of textarea */
+        margin-bottom: 8px; /* Add some margin to align with the textarea bottom */
+        min-width: 120px; /* Fixed width for button */
+        flex-shrink: 0; /* Prevent button from shrinking */
+      }
+
+      .error-message {
+        background-color: var(--error-color);
+        color: white;
+        padding: 10px 16px;
+        border-radius: 6px;
+        margin-top: 16px;
+        display: none;
+        font-weight: 500;
+      }
+
+      .error-message.visible {
+        display: block;
+        animation: fadeIn 0.3s;
+      }
+
+      .info-card {
+        flex: 1;
+        min-height: 220px;
+      }
+
+      .info-card table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .info-card td {
+        padding: 4px 0;
+        border-bottom: 1px dashed var(--border-color);
+      }
+
+      .info-card td:first-child {
+        width: 40%;
+      }
+
+      .info-card td:last-child {
+        text-align: right;
+        font-family: monospace;
+      }
+
+      .card-row {
+        display: flex;
+        gap: 24px;
+      }
+
+      @media (max-width: 767px) {
+        .card-row {
+          flex-direction: column;
+        }
+      }
+
+      .annotation {
+        font-size: 12px;
+        font-style: italic;
+        margin-top: 8px;
+        color: #777;
+      }
+
+      .explanation-text {
+        font-size: 16px;
+        line-height: 1.7;
+        margin-bottom: 24px;
+      }
+
+      .formula-container {
+        background-color: rgba(67, 97, 238, 0.05);
+        border-left: 3px solid var(--accent-color);
+        padding: 16px;
+        margin: 16px 0;
+        font-family: 'Georgia', serif;
+        overflow-x: auto; /* Allow horizontal scrolling for long formulas */
+      }
+
+      /* Axis styling */
+      .axis-label {
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .axis path,
+      .axis line {
+        stroke: var(--border-color);
+      }
+
+      .axis text {
+        fill: var(--text-color);
+        font-size: 12px;
+      }
+
+      .tooltip {
+        position: absolute;
+        padding: 10px;
+        background-color: var(--card-bg);
+        border-radius: 4px;
+        box-shadow: var(--card-shadow);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s;
+        font-size: 14px;
+      }
+
+      /* Info tooltip styling */
+      .info-tooltip {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        background-color: var(--accent-color);
+        color: white;
+        border-radius: 50%;
+        font-size: 12px;
+        line-height: 16px;
+        text-align: center;
+        margin-left: 5px;
+        cursor: help;
+        position: relative;
+      }
+
+      .info-tooltip .info-tooltip-text {
+        visibility: hidden;
+        width: 220px;
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        text-align: left;
+        border-radius: 6px;
+        padding: 10px;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -110px;
+        opacity: 0;
+        transition: opacity 0.3s;
+        box-shadow: var(--card-shadow);
+        font-weight: normal;
+        font-size: 12px;
+        line-height: 1.4;
+        pointer-events: none;
+      }
+
+      .info-tooltip:hover .info-tooltip-text {
+        visibility: visible;
+        opacity: 1;
+      }
+
+      .data-info {
+        margin-top: 8px;
+        font-size: 14px;
+        color: var(--secondary-accent);
+      }
+
+      /* Legend styling */
+      .legend {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 30px;
+        margin-top: 20px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .legend-color {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+      }
+
+      .histogram-legend {
+        background-color: var(--histogram-color);
+      }
+
+      .kde-legend {
+        background-color: var(--kde-color);
+      }
+
+      /* Toast notifications */
+      #toast {
+        visibility: hidden;
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        border-left: 4px solid var(--accent-color);
+        padding: 16px 24px;
+        border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 100;
+      }
+
+      #toast.show {
+        visibility: visible;
+        animation: fadein 0.5s, fadeout 0.5s 2.5s;
+      }
+
+      @keyframes fadein {
+        from {
+          bottom: 0;
+          opacity: 0;
+        }
+        to {
+          bottom: 30px;
+          opacity: 1;
+        }
+      }
+
+      @keyframes fadeout {
+        from {
+          bottom: 30px;
+          opacity: 1;
+        }
+        to {
+          bottom: 0;
+          opacity: 0;
+        }
+      }
+
+      /* Add styling for MathJax formulas */
+      .mjx-chtml {
+        margin: 10px 0;
+        font-size: 110% !important;
+      }
+
+      /* Kernel selector toggle styling */
+      .kernel-selector {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      .kernel-label {
+        font-size: 14px;
+        color: var(--text-color);
+      }
+
+      .kernel-toggle {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 28px;
+      }
+
+      .kernel-toggle-checkbox {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .kernel-toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--accent-color);
+        transition: 0.4s;
+        border-radius: 34px;
+      }
+
+      .kernel-toggle-slider:before {
+        position: absolute;
+        content: '';
+        height: 20px;
+        width: 20px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 50%;
+      }
+
+      .kernel-toggle-checkbox:checked + .kernel-toggle-slider {
+        background-color: var(--kde-color);
+      }
+
+      .kernel-toggle-checkbox:checked + .kernel-toggle-slider:before {
+        transform: translateX(32px);
+      }
+
+      /* Footer styling */
+      footer {
+        margin-top: 40px;
+        padding: 20px 0;
+        text-align: center;
+        border-top: 1px solid var(--border-color);
+        color: var(--text-color);
+        opacity: 0.8;
+        transition: opacity 0.3s;
+      }
+
+      footer:hover {
+        opacity: 1;
+      }
+
+      .author-info {
+        font-size: 14px;
+      }
+
+      .author-name {
+        font-weight: 600;
+        color: var(--accent-color);
+      }
+
+      /* Source link styling - fixed to work with themes */
+      .source-link {
+        color: var(--accent-color);
+        text-decoration: underline;
+        transition: color 0.3s;
+      }
+
+      .source-link:hover {
+        color: var(--secondary-accent);
+      }
+
+      /* Add styling for MathJax formulas */
+      .mjx-chtml {
+        margin: 10px 0;
+        font-size: 110% !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1 class="app-title">Kernel Density Estimation Explorer</h1>
+        <div class="header-controls">
+          <button
+            id="darkModeToggle"
+            class="dark-mode-toggle"
+            title="Toggle dark/light mode"
+          >
+            🔆
+          </button>
+        </div>
+      </header>
+
+      <div class="main-content">
+        <!-- Left Column - Interactive Visualization -->
+        <div class="visualization-column">
+          <div class="card">
+            <h2>KDE Visualization</h2>
+
+            <div class="control-row">
+              <div class="input-group" style="width: 100%; margin-right: 16px">
+                <label for="dataInput">Data Points (JSON array)</label>
+                <textarea
+                  id="dataInput"
+                  rows="6"
+                  placeholder="[10, 20, 15, 25, 30, 35, 20, 25, 27, 32]"
+                >
+[47,54,52,71,23,71,36,62,68,29,56,30,24,74,70,38,30,69,31,67,43,21,64,78,29,34,51,66,27,69,70,31,51,70,71,44,44,47,68,72,33,51,67,27,60,32,69,32,33,70,27,67,33,29,52,46,73,57,28,31,25,67,26,28,74,45,56,36,71,37,69,65,35,69,69,66,75,33,34,53,31,37,24,38,73,32,60,34,36,28,20,17,43,46,77,26,59,67,53,32,76,64,64,31,26,23,47,32,32,70,69,54,67,47,33,25,55,70,34,52,25,71,70,71,64,25,32,33,32,70,32,33,65,27,29,69,31,69,69,45,32,43,71,67,27,68,73,49,40,34,45,57,72,26,72,53,65,64,74,34,74,26,36,41,30,67,68,29,36,74,73,57,30,33,60,74,67,30,66,43,69,69,73,33,75,69,45,64,35,70,69,77,43,37,35,30,24,20,38,40,72,37,68,40,66,69,70,73,71,39,71,66,66,30,21,19,60,22,24,23,65,28,36,36,30,41,71,27,60,44,54,44,18,69,31,39,68,73,44,31,31,73,77,49,73,67,40,39,68,32,28,32,27,55,65,63,35,73,30,23,33,76,43,47,42,76,72,45,71,28,33,68,46,29,73,36,28,74,73,62,58,47,55,21,71,75,31,58,67,51,33,45,55,40,51,71,67,21,34,32]</textarea
+                >
+                <div id="dataInfo" class="data-info">70 data points</div>
+              </div>
+            </div>
+
+            <div class="control-row buttons-row">
+              <button
+                id="updateButton"
+                class="data-button"
+                onclick="updateChart()"
+              >
+                Update Chart
+              </button>
+              <button
+                id="generateData"
+                class="data-button"
+                onclick="generateRandomData()"
+              >
+                Generate Data
+              </button>
+            </div>
+
+            <div class="control-row">
+              <div class="slider-container">
+                <label for="bandwidthSlider"
+                  >Bandwidth (Smoothing Parameter)</label
+                >
+                <div class="slider-with-value">
+                  <input
+                    type="range"
+                    id="bandwidthSlider"
+                    min="0.5"
+                    max="15"
+                    step="0.1"
+                    value="3.5"
+                  />
+                  <span id="bandwidthValue" class="slider-value">3.5</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="control-row">
+              <div class="kernel-selector">
+                <span class="kernel-label">Gaussian</span>
+                <label class="kernel-toggle">
+                  <input
+                    type="checkbox"
+                    class="kernel-toggle-checkbox"
+                    id="kernelToggle"
+                  />
+                  <span class="kernel-toggle-slider"></span>
+                </label>
+                <span class="kernel-label">Epanechnikov</span>
+              </div>
+            </div>
+
+            <div class="svg-container" id="chart"></div>
+
+            <div class="legend">
+              <div class="legend-item">
+                <div class="legend-color histogram-legend"></div>
+                <span>Histogram</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-color kde-legend"></div>
+                <span>Kernel Density Estimate</span>
+              </div>
+            </div>
+
+            <div id="error-message" class="error-message"></div>
+          </div>
+
+          <div class="card-row">
+            <div class="card info-card">
+              <h2>Data Summary</h2>
+              <div id="dataSummary"></div>
+            </div>
+            <div class="card info-card">
+              <h2>KDE Properties</h2>
+              <div id="kdeProperties"></div>
+            </div>
+          </div>
+
+          <!-- New Developer Implementation Guide section -->
+          <div class="card">
+            <h2>Developer Implementation Guide</h2>
+
+            <div class="dev-guide-content">
+              <div class="dev-section">
+                <h3>Core Implementation</h3>
+                <ul class="dev-list">
+                  <li>
+                    <strong>KDE Formula:</strong>
+                    <code>f(x) = (1/nh) * sum(K((x-xi)/h))</code>
+                    <span class="code-note"
+                      >Where h=bandwidth, K=kernel function</span
+                    >
+                  </li>
+                  <li>
+                    <strong>Required Libraries:</strong> D3.js (visualization),
+                    Math.js (optional for complex calculations)
+                  </li>
+                  <li>
+                    <strong>Functions Needed:</strong>
+                    <ul>
+                      <li>
+                        <code>kernelFunction(x)</code> - Implements kernel
+                        (Gaussian, Epanechnikov)
+                      </li>
+                      <li>
+                        <code>calculateBandwidth(data)</code> - Implements
+                        Silverman's rule
+                      </li>
+                      <li>
+                        <code
+                          >kdeEstimator(points, bandwidth, kernel, range,
+                          resolution)</code
+                        >
+                        - Main KDE calculator
+                      </li>
+                    </ul>
+                  </li>
+                </ul>
+              </div>
+
+              <div class="dev-section">
+                <h3>Key Algorithms</h3>
+                <div class="code-block">
+                  <code>
+                    // Kernel function implementations<br />
+                    // 1. Gaussian kernel<br />
+                    function gaussianKernel(x) {<br />
+                    &nbsp;&nbsp;return (1 / Math.sqrt(2 * Math.PI)) *
+                    Math.exp(-0.5 * x * x);<br />
+                    }<br /><br />
+
+                    // 2. Epanechnikov kernel<br />
+                    function epanechnikovKernel(x) {<br />
+                    &nbsp;&nbsp;// The most efficient kernel in minimizing mean
+                    integrated squared error<br />
+                    &nbsp;&nbsp;return Math.abs(x) <= 1 ? 0.75 * (1 - x * x) :
+                    0;<br />
+                    }<br /><br />
+
+                    // Silverman's bandwidth rule<br />
+                    function calculateSilvermanBandwidth(data) {<br />
+                    &nbsp;&nbsp;const stdDev = calculateStdDev(data);<br />
+                    &nbsp;&nbsp;const iqr = calculateIQR(data);<br />
+                    &nbsp;&nbsp;return 0.9 * Math.min(stdDev, iqr/1.34) *
+                    Math.pow(data.length, -1/5);<br />
+                    }<br /><br />
+
+                    // Main KDE calculator<br />
+                    function kernelDensityEstimator(kernel, bandwidth) {<br />
+                    &nbsp;&nbsp;return function(sample) {<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;return function(x) {<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return
+                    sample.reduce((sum, dataPoint) => {<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return sum +
+                    kernel((x - dataPoint) / bandwidth);<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}, 0) / (bandwidth *
+                    sample.length);<br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;};<br />
+                    &nbsp;&nbsp;};<br />
+                    }
+                  </code>
+                </div>
+              </div>
+
+              <div class="dev-section">
+                <h3>Integration Tips</h3>
+                <ul class="dev-list">
+                  <li>
+                    <strong>Performance:</strong> For large datasets (>1000
+                    points), consider sampling or using parallel processing for
+                    KDE calculations
+                  </li>
+                  <li>
+                    <strong>Responsiveness:</strong> Recalculate KDE only when
+                    data/bandwidth changes, not on every render
+                  </li>
+                  <li>
+                    <strong>Precision vs Speed:</strong> Adjust plot resolution
+                    (number of points in KDE curve) based on performance needs
+                  </li>
+                </ul>
+              </div>
+
+              <div class="dev-section">
+                <h3>Common Issues & Solutions</h3>
+                <table class="issues-table">
+                  <tr>
+                    <th>Issue</th>
+                    <th>Cause</th>
+                    <th>Solution</th>
+                  </tr>
+                  <tr>
+                    <td>Curve too spiky</td>
+                    <td>Bandwidth too small</td>
+                    <td>Increase bandwidth or apply adaptive bandwidth</td>
+                  </tr>
+                  <tr>
+                    <td>Curve too smooth</td>
+                    <td>Bandwidth too large</td>
+                    <td>Decrease bandwidth according to data range</td>
+                  </tr>
+                  <tr>
+                    <td>Computational lag</td>
+                    <td>Too many data points</td>
+                    <td>Sample data or reduce KDE resolution</td>
+                  </tr>
+                  <tr>
+                    <td>Edge effects</td>
+                    <td>Data boundaries improperly handled</td>
+                    <td>Use boundary correction methods</td>
+                  </tr>
+                </table>
+              </div>
+
+              <div class="dev-section">
+                <h3>Advanced Features</h3>
+                <ul class="dev-list">
+                  <li>
+                    <strong>Adaptive Bandwidth:</strong> Adjust bandwidth
+                    locally based on data density
+                    <code>h_i = h * (f(x_i)/g)^(-0.5)</code>
+                  </li>
+                  <li>
+                    <strong>Multivariate KDE:</strong> Extend to 2D using
+                    product kernel
+                    <code>K(x,y) = K(x) * K(y)</code>
+                  </li>
+                  <li>
+                    <strong>Boundary Correction:</strong> Use reflection or
+                    boundary kernels near data limits
+                  </li>
+                  <li>
+                    <strong>Automatic Bimodality Detection:</strong>
+                    <code>
+                      bimodality = (skewness² + 1) / (kurtosis +
+                      3*(n-1)²/(n-2)(n-3))
+                    </code>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column - Theory & Explanations -->
+        <div class="theory-column">
+          <div class="card">
+            <h2>Understanding Kernel Density Estimation</h2>
+            <div class="explanation-text">
+              <p>
+                Kernel Density Estimation (KDE) is a non-parametric way to
+                estimate the probability density function of a random variable.
+                Unlike histograms, KDE produces a smooth curve that helps
+                visualize the underlying distribution of data points without
+                assuming a specific parametric form.
+              </p>
+
+              <h3>The KDE Formula</h3>
+              <div class="formula-container">
+                <p>
+                  \[ \hat{f}_h(x) = \frac{1}{nh} \sum_{i=1}^{n} K\left(\frac{x -
+                  x_i}{h}\right) \]
+                </p>
+                <p>where:</p>
+                <ul>
+                  <li>\( K \) is the kernel function (typically a Gaussian)</li>
+                  <li>\( h \) is the bandwidth (smoothing parameter)</li>
+                  <li>\( x_i \) are the individual data points</li>
+                  <li>\( n \) is the number of data points</li>
+                </ul>
+              </div>
+
+              <h3>Key Concepts</h3>
+              <p>
+                <strong>Kernel Function:</strong> A symmetric function that
+                integrates to 1. Common kernels include:
+              </p>
+              <ul>
+                <li>
+                  <strong>Gaussian (normal):</strong> \( K(u) =
+                  \frac{1}{\sqrt{2\pi}} e^{-\frac{u^2}{2}} \)
+                  <span class="searchable-text"
+                    >(This is a bell curve shape)</span
+                  >
+                </li>
+                <li>
+                  <strong>Epanechnikov:</strong> \( K(u) = \frac{3}{4}(1-u^2) \)
+                  for \(|u| \leq 1\)
+                </li>
+                <li>
+                  <strong>Uniform:</strong> \( K(u) = \frac{1}{2} \) for \(|u|
+                  \leq 1\)
+                </li>
+              </ul>
+              <p>
+                <strong>Bandwidth:</strong> Controls the smoothness of the
+                estimate. A smaller bandwidth captures more local variation but
+                may overfit the data, while a larger bandwidth creates a
+                smoother density but may mask important features.
+              </p>
+
+              <div class="note-box">
+                <h4>Why KDE Often Resembles a Bell Curve</h4>
+                <p>
+                  KDE often appears as a bell curve (or a combination of bell
+                  curves) because:
+                </p>
+                <ul>
+                  <li>The Gaussian kernel function itself is bell-shaped</li>
+                  <li>
+                    When using larger bandwidths, the individual kernels blend
+                    together to form a smoother bell-like curve
+                  </li>
+                  <li>
+                    The sum of many bell-shaped functions (one placed at each
+                    data point) naturally creates bell-shaped density curves
+                  </li>
+                </ul>
+                <p>
+                  This bell curve appearance is more pronounced with higher
+                  bandwidth values, which smooth out local variations in the
+                  data.
+                </p>
+              </div>
+
+              <h3>How to Interpret</h3>
+              <p>
+                The KDE curve shows the estimated probability density of your
+                data. Peaks in the curve indicate values where data points are
+                concentrated. The area under the curve between any two points
+                gives the approximate probability of finding a data point within
+                that range.
+              </p>
+              <p>
+                Try adjusting the bandwidth slider to see how it affects the
+                density estimate. Notice how low bandwidth values lead to a
+                "spiky" curve that may overfit the data, while high values
+                produce an overly smooth curve that might miss important
+                features.
+              </p>
+
+              <h3>Advantages of KDE</h3>
+              <ul>
+                <li>
+                  Provides a smooth visualization of the data distribution
+                </li>
+                <li>Does not assume a specific parametric form</li>
+                <li>
+                  Can reveal multimodality, skewness, and other distributional
+                  features that might be hidden in histograms
+                </li>
+                <li>
+                  Works well for continuous variables and is differentiable
+                </li>
+                <li>
+                  More efficient than histograms for density estimation when
+                  used with appropriate bandwidth
+                </li>
+              </ul>
+
+              <h3>Bandwidth Selection</h3>
+              <p>
+                Choosing an appropriate bandwidth is crucial for KDE. This
+                visualization uses Silverman's rule of thumb as a starting
+                point:
+              </p>
+              <div class="formula-container">
+                <p>
+                  \[ h = 0.9 \times \min(\sigma, \text{IQR}/1.34) \times
+                  n^{-1/5} \]
+                </p>
+                <p>where:</p>
+                <ul>
+                  <li>\( \sigma \) is the standard deviation of the data</li>
+                  <li>\( \text{IQR} \) is the interquartile range</li>
+                  <li>\( n \) is the sample size</li>
+                </ul>
+              </div>
+              <p>
+                <strong>Mathematical Basis:</strong> This rule is derived from minimizing the asymptotic mean integrated squared error (AMISE) between the true density and its estimate. The constant 0.9 is optimal for Gaussian distributions, while the power term (-1/5) comes from the rate at which bandwidth should decrease as sample size increases.
+              </p>
+              <p>
+                <strong>Interpreting the Formula:</strong>
+                <ul>
+                  <li>The minimum of \( \sigma \) and \( \text{IQR}/1.34 \) helps make the rule robust to outliers</li>
+                  <li>The \( n^{-1/5} \) factor ensures that bandwidth decreases as sample size increases, but at a slower rate than the variance of the estimator</li>
+                  <li>The 0.9 multiplier is calibrated to be optimal for normal distributions</li>
+                </ul>
+              </p>
+              <p>
+                <strong>When It Works Well:</strong> Silverman's rule works best for unimodal, approximately normal data. For multimodal or skewed distributions, it may oversmooth and hide important features. In such cases, alternative approaches include:
+              </p>
+              <ul>
+                <li><strong>Cross-validation:</strong> Choose bandwidth that minimizes prediction error</li>
+                <li><strong>Plug-in methods:</strong> Direct estimation of the functional that needs to be minimized</li>
+                <li><strong>Rule multipliers:</strong> For multimodal data, using 0.5-0.8× the Silverman value often preserves important features</li>
+              </ul>
+              <p>
+                This rule works well for unimodal, approximately normal data.
+                For multimodal data, some adjustments may be needed.
+              </p>
+
+              <h3>When to Use KDE</h3>
+              <p>KDE is particularly useful when:</p>
+              <ul>
+                <li>You want to visualize the shape of a distribution</li>
+                <li>
+                  You suspect the data might not follow a standard parametric
+                  distribution
+                </li>
+                <li>You need to identify modes or clusters in the data</li>
+                <li>You want to compare multiple distributions visually</li>
+                <li>
+                  You need a smooth estimate of the probability density function
+                </li>
+              </ul>
+
+              <h3>KDE vs. Other Density Estimation Methods</h3>
+              <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <tr style="background-color: rgba(67, 97, 238, 0.05); border-bottom: 1px solid var(--border-color);">
+                  <th style="text-align: left; padding: 8px 12px;">Method</th>
+                  <th style="text-align: left; padding: 8px 12px;">Advantages</th>
+                  <th style="text-align: left; padding: 8px 12px;">Limitations</th>
+                  <th style="text-align: left; padding: 8px 12px;">Best For</th>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                  <td style="padding: 8px 12px;"><strong>KDE</strong></td>
+                  <td style="padding: 8px 12px;">
+                    - Smooth, continuous estimate<br>
+                    - No parametric assumptions<br>
+                    - Preserves multimodality
+                  </td>
+                  <td style="padding: 8px 12px;">
+                    - Bandwidth selection critical<br>
+                    - Computationally intensive<br>
+                    - Boundary bias issues
+                  </td>
+                  <td style="padding: 8px 12px;">
+                    - Unknown distribution shapes<br>
+                    - Detailed distribution analysis<br>
+                    - Moderate-sized datasets
+                  </td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                  <td style="padding: 8px 12px;"><strong>Histogram</strong></td>
+                  <td style="padding: 8px 12px;">
+                    - Simple to understand<br>
+                    - Computationally efficient<br>
+                    - Shows raw data structure
+                  </td>
+                  <td style="padding: 8px 12px;">
+                    - Bin width/location affects appearance<br>
+                    - Discontinuous<br>
+                    - Difficult for multivariate data
+                  </td>
+                  <td style="padding: 8px 12px;">
+                    - Initial data exploration<br>
+                    - Large datasets<br>
+                    - When simplicity is valued
+                  </td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                  <td style="padding: 8px 12px;"><strong>Parametric Methods</strong><br>(e.g., fitting normal distribution)</td>
+                  <td style="padding: 8px 12px;">
+                    - Very smooth results<br>
+                    - Statistically efficient<br>
+                    - Works with small samples
+                  </td>
+                  <td style="padding: 8px 12px;">
+                    - Assumes specific distribution form<br>
+                    - May miss multimodality<br>
+                    - Can severely misrepresent data
+                  </td>
+                  <td style="padding: 8px 12px;">
+                    - Known distribution family<br>
+                    - Small sample sizes<br>
+                    - Hypothesis testing
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 12px;"><strong>Adaptive KDE</strong></td>
+                  <td style="padding: 8px 12px;">
+                    - Adjusts bandwidth locally<br>
+                    - Better handles varying density<br>
+                    - Preserves peaks and tails
+                  </td>
+                  <td style="padding: 8px 12px;">
+                    - More complex implementation<br>
+                    - Additional parameters to tune<br>
+                    - Higher computational cost
+                  </td>
+                  <td style="padding: 8px 12px;">
+                    - Mixture distributions<br>
+                    - Heavy-tailed data<br>
+                    - When preservation of features is critical
+                  </td>
+                </tr>
+              </table>
+              <p><em>Note: The choice of method depends on your specific analytical goals, the size and nature of your dataset, and the level of detail required.</em></p>
+
+              <h3>Sources & Further Reading</h3>
+              <ul>
+                <li>
+                  Silverman, B.W. (1986).
+                  <em>Density Estimation for Statistics and Data Analysis</em>.
+                  Chapman and Hall.
+                </li>
+                <li>
+                  Scott, D.W. (2015).
+                  <em
+                    >Multivariate Density Estimation: Theory, Practice, and
+                    Visualization</em
+                  >. 2nd Ed. Wiley.
+                </li>
+                <li>
+                  Wand, M.P., & Jones, M.C. (1995). <em>Kernel Smoothing</em>.
+                  Chapman and Hall/CRC.
+                </li>
+                <li>
+                  Wasserman, L. (2006).
+                  <em>All of Nonparametric Statistics</em>. Springer.
+                </li>
+                <li>
+                  Chen, Y.C. (2017).
+                  <a
+                    href="https://projecteuclid.org/journals/statistical-science/volume-32/issue-1/A-Tutorial-on-Kernel-Density-Estimation-and-Recent-Advances/10.1214/16-STS558.full"
+                    class="source-link"
+                    >A Tutorial on Kernel Density Estimation and Recent
+                    Advances</a
+                  >, Statistical Science, 32(1), 70-85.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast notification element -->
+    <div id="toast"></div>
+
+    <script>
+      // =============================================================
+      // GLOBAL VARIABLES & STATE
+      // =============================================================
+
+      // Global state variables
+      let rawData = []; // Raw unbucketed data points
+      let histogramData = {}; // Bucketed data for the histogram
+      let bandwidth = 3.5; // Current bandwidth value
+      let defaultBandwidth = 3.5; // Optimal bandwidth calculated using Silverman's rule
+      let userAdjustedBandwidth = false; // Flag to track if user manually adjusted bandwidth
+      let selectedKernel = 'gaussian'; // Current kernel function (default: gaussian)
+
+      // =============================================================
+      // DATA PROCESSING & STATISTICAL FUNCTIONS
+      // =============================================================
+
+      /**
+       * Calculate mean of an array of numbers
+       */
+      function mean(arr) {
+        return arr.reduce((a, b) => a + b, 0) / arr.length;
+      }
+
+      /**
+       * Calculate variance of an array of numbers
+       */
+      function variance(arr) {
+        const m = mean(arr);
+        return arr.reduce((a, b) => a + Math.pow(b - m, 2), 0) / arr.length;
+      }
+
+      /**
+       * Calculate standard deviation of an array of numbers
+       */
+      function standardDeviation(arr) {
+        return Math.sqrt(variance(arr));
+      }
+
+      /**
+       * Calculate median of an array of numbers
+       */
+      function median(arr) {
+        const sorted = [...arr].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 === 0
+          ? (sorted[mid - 1] + sorted[mid]) / 2
+          : sorted[mid];
+      }
+
+      /**
+       * Calculate quartile of an array of numbers
+       */
+      function quartile(arr, q) {
+        const sorted = [...arr].sort((a, b) => a - b);
+        const pos = (sorted.length - 1) * q;
+        const base = Math.floor(pos);
+        const rest = pos - base;
+        if (sorted[base + 1] !== undefined) {
+          return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
+        } else {
+          return sorted[base];
+        }
+      }
+
+      /**
+       * Gaussian kernel function
+       */
+      function gaussianKernel(x) {
+        // Standard normal kernel function
+        return (1 / Math.sqrt(2 * Math.PI)) * Math.exp(-0.5 * x * x);
+      }
+
+      /**
+       * Epanechnikov kernel function
+       */
+      function epanechnikovKernel(x) {
+        return Math.abs(x) <= 1 ? 0.75 * (1 - x * x) : 0;
+      }
+
+      /**
+       * Uniform kernel function
+       */
+      function uniformKernel(x) {
+        return Math.abs(x) <= 1 ? 0.5 : 0;
+      }
+
+      /**
+       * Calculates the optimal bandwidth using Silverman's rule of thumb
+       * @param {Array} data - Array of numeric data points
+       * @returns {number} - Optimal bandwidth value
+       */
+      function calculateSilvermanBandwidth(data) {
+        // Calculate standard deviation
+        const mean = d3.mean(data);
+        const variance =
+          data.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) /
+          data.length;
+        const stdDev = Math.sqrt(variance);
+
+        // Calculate IQR (Interquartile Range) using linear interpolation
+        // This is important as different quantile calculation methods can affect the bandwidth
+        const sorted = [...data].sort(d3.ascending);
+        const q25 = d3.quantile(sorted, 0.25);
+        const q75 = d3.quantile(sorted, 0.75);
+        const iqr = q75 - q25;
+
+        // Standard Silverman's rule of thumb: h = 0.9 * min(σ, IQR/1.34) * n^(-1/5)
+        // This is optimal for unimodal, approximately normal distributions
+        let bandwidthValue =
+          0.9 * Math.min(stdDev, iqr / 1.34) * Math.pow(data.length, -1 / 5);
+
+        // Adjustment for multimodal data
+        // Note: Silverman's rule assumes a unimodal normal distribution
+        // For multimodal data, the literature suggests scaling factors ranging from 1.5-2.5
+        // See: Wand & Jones (1995) "Kernel Smoothing", p. 60-61; and
+        // Scott (2015) "Multivariate Density Estimation: Theory, Practice, and Visualization", 2nd Ed.
+        const multimodalAdjustment = 2.0;
+        bandwidthValue *= multimodalAdjustment;
+
+        // Ensure a sensible minimum value
+        // For very small datasets, a minimum bandwidth helps prevent overfitting
+        return Math.max(1, bandwidthValue);
+      }
+
+      /**
+       * Calculate kernel density estimate at a specific point
+       */
+      function kernelDensityEstimator(kernel, bandwidth) {
+        return function (sample) {
+          return function (x) {
+            return mean(
+              sample.map((v) => kernel((x - v) / bandwidth) / bandwidth)
+            );
+          };
+        };
+      }
+
+      /**
+       * Calculates the optimal number of bins for a histogram using the square root rule
+       * @param {Array} data - Array of numeric data points
+       * @returns {number} - Optimal bin count
+       */
+      function calculateOptimalBinCount(data) {
+        return Math.ceil(Math.sqrt(data.length));
+      }
+
+      /**
+       * Calculate statistical summary of the data
+       * @param {Array} data - Array of numeric data points
+       * @returns {Object} - Object with statistical measures
+       */
+      function calculateDataSummary(data) {
+        if (data.length === 0) return null;
+
+        const sorted = [...data].sort(d3.ascending);
+        const meanValue = d3.mean(data);
+        const medianValue = d3.median(data);
+        const minValue = d3.min(data);
+        const maxValue = d3.max(data);
+        const q1 = d3.quantile(sorted, 0.25);
+        const q3 = d3.quantile(sorted, 0.75);
+        const iqr = q3 - q1;
+
+        // Calculate standard deviation
+        const variance =
+          data.reduce((sum, val) => sum + Math.pow(val - meanValue, 2), 0) /
+          data.length;
+        const stdDev = Math.sqrt(variance);
+
+        // Calculate skewness and kurtosis
+        let skewness = 0;
+        let kurtosis = 0;
+
+        data.forEach((val) => {
+          const diff = val - meanValue;
+          const normalizedDiff = diff / stdDev;
+          skewness += Math.pow(normalizedDiff, 3);
+          kurtosis += Math.pow(normalizedDiff, 4);
+        });
+
+        skewness = skewness / data.length;
+        kurtosis = kurtosis / data.length - 3; // Excess kurtosis (normal = 0)
+
+        // Check for potential multimodality (very simple heuristic)
+        const binCount = Math.min(50, Math.ceil(Math.sqrt(data.length)));
+        const histData = d3.bin().thresholds(binCount)(data);
+
+        // Find peaks in the histogram
+        const peaks = [];
+        for (let i = 1; i < histData.length - 1; i++) {
+          if (
+            histData[i].length > histData[i - 1].length &&
+            histData[i].length > histData[i + 1].length &&
+            histData[i].length > data.length / (binCount * 3)
+          ) {
+            peaks.push({
+              bin: histData[i].x0,
+              count: histData[i].length,
+            });
+          }
+        }
+
+        return {
+          count: data.length,
+          mean: meanValue,
+          median: medianValue,
+          min: minValue,
+          max: maxValue,
+          range: maxValue - minValue,
+          q1: q1,
+          q3: q3,
+          iqr: iqr,
+          stdDev: stdDev,
+          variance: variance,
+          skewness: skewness,
+          kurtosis: kurtosis,
+          potentialModality:
+            peaks.length <= 1
+              ? 'Likely unimodal'
+              : peaks.length === 2
+              ? 'Potentially bimodal'
+              : 'Potentially multimodal',
+        };
+      }
+
+      /**
+       * Generate KDE information for the current settings
+       * @returns {Object} - Object with KDE properties
+       */
+      function getKDEProperties() {
+        const silvermanBandwidth = defaultBandwidth;
+        const currentBandwidth = bandwidth;
+        const relativeSmoothing = currentBandwidth / silvermanBandwidth;
+
+        // Get the kernel name based on selection
+        let kernelName;
+        switch (selectedKernel) {
+          case 'epanechnikov':
+            kernelName = 'Epanechnikov';
+            break;
+          case 'uniform':
+            kernelName = 'Uniform';
+            break;
+          case 'gaussian':
+          default:
+            kernelName = 'Gaussian';
+            break;
+        }
+
+        let smoothnessAssessment;
+        if (relativeSmoothing < 0.6) {
+          smoothnessAssessment = 'Undersmoothed - may show noise as signal';
+        } else if (relativeSmoothing < 0.9) {
+          smoothnessAssessment = 'Slightly undersmoothed - shows fine details';
+        } else if (relativeSmoothing <= 1.1) {
+          smoothnessAssessment = "Optimal smoothing (per Silverman's rule)";
+        } else if (relativeSmoothing <= 2) {
+          smoothnessAssessment =
+            'Slightly oversmoothed - minor details reduced';
+        } else if (relativeSmoothing <= 4) {
+          smoothnessAssessment = 'Oversmoothed - only shows major features';
+        } else {
+          smoothnessAssessment =
+            'Highly oversmoothed - may obscure true structure';
+        }
+
+        return {
+          kernelType: kernelName,
+          silvermanBandwidth: silvermanBandwidth,
+          currentBandwidth: currentBandwidth,
+          relativeSmoothing: relativeSmoothing,
+          smoothnessAssessment: smoothnessAssessment,
+        };
+      }
+
+      // =============================================================
+      // CHART RENDERING FUNCTIONS
+      // =============================================================
+
+      /**
+       * Get the appropriate kernel function based on user selection
+       */
+      function getKernelFunction() {
+        switch (selectedKernel) {
+          case 'epanechnikov':
+            return epanechnikovKernel;
+          case 'uniform':
+            return uniformKernel;
+          case 'gaussian':
+          default:
+            return gaussianKernel;
+        }
+      }
+
+      /**
+       * Draw the chart with current data and bandwidth
+       */
+      function drawChart(data, bandwidth) {
+        // Clear any previous chart
+        d3.select('#chart').html('');
+
+        // Set up dimensions and margins
+        const margin = { top: 20, right: 30, bottom: 40, left: 80 }; // Further increased left margin for y-axis label
+        const width =
+          document.getElementById('chart').clientWidth -
+          margin.left -
+          margin.right;
+        const height =
+          document.getElementById('chart').clientHeight -
+          margin.top -
+          margin.bottom;
+
+        // Determine the domain based on the data
+        const x = d3
+          .scaleLinear()
+          .domain([
+            d3.min(data) - 0.1 * (d3.max(data) - d3.min(data)),
+            d3.max(data) + 0.1 * (d3.max(data) - d3.min(data)),
+          ])
+          .range([0, width]);
+
+        // Create SVG element
+        const svg = d3
+          .select('#chart')
+          .append('svg')
+          .attr('width', width + margin.left + margin.right)
+          .attr('height', height + margin.top + margin.bottom)
+          .append('g')
+          .attr('transform', `translate(${margin.left},${margin.top})`);
+
+        // Compute the histogram with consistent binning
+        const binCount = Math.min(30, Math.floor(data.length / 3));
+        const histogram = d3
+          .histogram()
+          .domain(x.domain())
+          .thresholds(x.ticks(binCount)) // Use consistent tick values for binning
+          .value((d) => d);
+
+        const histData = histogram(data);
+
+        // Calculate the bin width for proper density normalization
+        const binWidth =
+          histData.length > 0 ? histData[0].x1 - histData[0].x0 : 1;
+
+        // Y scale for histogram - normalized by bin width for proper density
+        const y = d3
+          .scaleLinear()
+          .domain([
+            0,
+            // Scale factor for count to frequency density: divide by n and bin width
+            d3.max(histData, (d) => d.length / data.length / binWidth) * 1.1,
+          ])
+          .nice()
+          .range([height, 0]);
+
+        // Add X axis
+        svg
+          .append('g')
+          .attr('class', 'axis')
+          .attr('transform', `translate(0,${height})`)
+          .call(d3.axisBottom(x));
+
+        // Add X axis label
+        svg
+          .append('text')
+          .attr('class', 'axis-label')
+          .attr('x', width / 2)
+          .attr('y', height + margin.bottom - 5)
+          .style('text-anchor', 'middle')
+          .style('fill', 'var(--text-color)')
+          .text('Value');
+
+        // Add Y axis with appropriate tick format
+        svg
+          .append('g')
+          .attr('class', 'axis')
+          .call(
+            d3
+              .axisLeft(y)
+              .ticks(5)
+              .tickFormat((d) => (d * 100).toFixed(1) + '%') // Format as percentage with 1 decimal
+          )
+          .selectAll('text')
+          .style('fill', 'var(--text-color)');
+
+        // Add Y axis label
+        svg
+          .append('text')
+          .attr('class', 'axis-label')
+          .attr('transform', 'rotate(-90)')
+          .attr('y', -margin.left + 15) // Move even further left
+          .attr('x', -height / 2)
+          .attr('dy', '1em')
+          .style('text-anchor', 'middle')
+          .style('fill', 'var(--text-color)')
+          .text('Probability Density (%)');
+
+        // Add grid lines
+        svg
+          .append('g')
+          .attr('class', 'grid')
+          .attr('transform', `translate(0,${height})`)
+          .call(d3.axisBottom(x).tickSize(-height).tickFormat(''))
+          .selectAll('.tick line')
+          .style('stroke', 'var(--chart-grid)')
+          .style('stroke-opacity', 0.5);
+
+        // Add histogram bars - ensuring correct normalization for density
+        svg
+          .selectAll('rect')
+          .data(histData)
+          .enter()
+          .append('rect')
+          .attr('x', (d) => x(d.x0) + 1)
+          .attr('width', (d) => Math.max(0, x(d.x1) - x(d.x0) - 1))
+          .attr('y', (d) => {
+            // Convert count to density: count / (n * bin width)
+            const density = d.length / (data.length * binWidth);
+            return y(density);
+          })
+          .attr('height', (d) => {
+            // Convert count to density: count / (n * bin width)
+            const density = d.length / (data.length * binWidth);
+            return height - y(density);
+          })
+          .style('fill', 'var(--histogram-color)')
+          .style('opacity', 0.7);
+
+        // Use the selected kernel function
+        const kernelFunction = getKernelFunction();
+
+        // Compute kernel density estimation with explicit normalization
+        const kde = kernelDensityEstimator(kernelFunction, bandwidth)(data);
+
+        // Generate points for the KDE line
+        const numPoints = 100;
+        const kdePoints = [];
+        for (let i = 0; i <= numPoints; i++) {
+          const x0 =
+            x.domain()[0] + (i / numPoints) * (x.domain()[1] - x.domain()[0]);
+          kdePoints.push({ x: x0, y: kde(x0) });
+        }
+
+        // Add the KDE line
+        svg
+          .append('path')
+          .datum(kdePoints)
+          .attr('fill', 'none')
+          .attr('stroke', 'var(--kde-color)')
+          .attr('stroke-width', 3)
+          .attr(
+            'd',
+            d3
+              .line()
+              .x((d) => x(d.x))
+              .y((d) => y(d.y))
+          );
+
+        // Add the KDE area
+        svg
+          .append('path')
+          .datum(kdePoints)
+          .attr('fill', 'var(--kde-fill)')
+          .attr(
+            'd',
+            d3
+              .area()
+              .x((d) => x(d.x))
+              .y0(height)
+              .y1((d) => y(d.y))
+          );
+
+        // Create tooltip
+        const tooltip = d3
+          .select('body')
+          .append('div')
+          .attr('class', 'tooltip');
+
+        // Add tooltip interaction to the KDE line
+        svg
+          .selectAll('path')
+          .on('mousemove', function (event) {
+            const [mouseX, mouseY] = d3.pointer(event);
+            const xValue = x.invert(mouseX).toFixed(2);
+            const closestPoint = kdePoints.reduce((prev, curr) => {
+              return Math.abs(curr.x - xValue) < Math.abs(prev.x - xValue)
+                ? curr
+                : prev;
+            });
+
+            tooltip
+              .style('opacity', 1)
+              .style('left', event.pageX + 10 + 'px')
+              .style('top', event.pageY - 10 + 'px')
+              .html(
+                `Value: ${xValue}<br>Density: ${(closestPoint.y * 100).toFixed(
+                  2
+                )}%`
+              );
+          })
+          .on('mouseout', function () {
+            tooltip.style('opacity', 0);
+          });
+
+        // Add tooltip interaction to histogram bars
+        svg
+          .selectAll('rect')
+          .on('mousemove', function (event, d) {
+            const density = d.length / (data.length * binWidth);
+
+            tooltip
+              .style('opacity', 1)
+              .style('left', event.pageX + 10 + 'px')
+              .style('top', event.pageY - 10 + 'px')
+              .html(
+                `Range: ${d.x0.toFixed(2)} - ${d.x1.toFixed(2)}<br>Count: ${
+                  d.length
+                }<br>Density: ${(density * 100).toFixed(2)}%`
+              );
+          })
+          .on('mouseout', function () {
+            tooltip.style('opacity', 0);
+          });
+
+        // Add explanation note about the vertical axis
+        svg
+          .append('text')
+          .attr('x', width - 20)
+          .attr('y', height - 10)
+          .attr('class', 'annotation')
+          .style('text-anchor', 'end')
+          .style('font-size', '10px')
+          .style('fill', 'var(--text-color)')
+          .style('opacity', 0.8)
+          .text('Area under curve = total probability');
+
+        // Fix axis appearance for dark mode
+        svg
+          .selectAll('.axis path, .axis line')
+          .style('stroke', 'var(--border-color)');
+
+        svg.selectAll('.axis text').style('fill', 'var(--text-color)');
+      }
+
+      // =============================================================
+      // UI UPDATE FUNCTIONS
+      // =============================================================
+
+      /**
+       * Update the data summary card with current statistics
+       */
+      function updateDataSummaryCard() {
+        const summary = calculateDataSummary(rawData);
+        if (!summary) return;
+
+        const summaryHtml = `
+          <table>
+            <tr>
+              <td><strong>Count:</strong></td>
+              <td>${summary.count}</td>
+            </tr>
+            <tr>
+              <td><strong>Range:</strong><span class="info-tooltip">i<span class="info-tooltip-text">The minimum to maximum values in the dataset, showing the full spread of data points.</span></span></td>
+              <td>${summary.min.toFixed(1)} - ${summary.max.toFixed(1)}</td>
+            </tr>
+            <tr>
+              <td><strong>Mean:</strong><span class="info-tooltip">i<span class="info-tooltip-text">The average of all data points, calculated by summing all values and dividing by the count.</span></span></td>
+              <td>${summary.mean.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td><strong>Median:</strong><span class="info-tooltip">i<span class="info-tooltip-text">The middle value when data is arranged in order. More robust to outliers than the mean.</span></span></td>
+              <td>${summary.median.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td><strong>Std Dev:</strong><span class="info-tooltip">i<span class="info-tooltip-text">Standard deviation measures how spread out the data is from the mean. Higher values indicate more variability.</span></span></td>
+              <td>${summary.stdDev.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td><strong>IQR:</strong><span class="info-tooltip">i<span class="info-tooltip-text">Interquartile Range is the difference between the 75th and 25th percentiles, showing the middle 50% of data. Useful for identifying outliers.</span></span></td>
+              <td>${summary.iqr.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td><strong>Skewness:</strong><span class="info-tooltip">i<span class="info-tooltip-text">Measures asymmetry in the distribution. Positive values indicate right skew (long tail to the right), negative values indicate left skew. Values near zero suggest symmetry.</span></span></td>
+              <td>${summary.skewness.toFixed(3)}</td>
+            </tr>
+            <tr>
+              <td><strong>Kurtosis:</strong><span class="info-tooltip">i<span class="info-tooltip-text">Measures the "tailedness" of the distribution. Positive values indicate heavier tails than a normal distribution. Negative values indicate lighter tails. This is excess kurtosis where normal distribution = 0.</span></span></td>
+              <td>${summary.kurtosis.toFixed(3)}</td>
+            </tr>
+            <tr>
+              <td><strong>Modality:</strong><span class="info-tooltip">i<span class="info-tooltip-text">Refers to the number of peaks in the distribution. Unimodal has one peak, bimodal has two peaks, and multimodal has three or more peaks.</span></span></td>
+              <td>${summary.potentialModality}</td>
+            </tr>
+          </table>
+        `;
+
+        document.getElementById('dataSummary').innerHTML = summaryHtml;
+        document.getElementById(
+          'dataInfo'
+        ).textContent = `${summary.count} data points`;
+      }
+
+      /**
+       * Update the KDE properties card
+       */
+      function updateKDEPropertiesCard() {
+        const kdeProps = getKDEProperties();
+
+        const kdeHtml = `
+          <table>
+            <tr>
+              <td><strong>Kernel Function:</strong><span class="info-tooltip">i<span class="info-tooltip-text">The mathematical function used to create the smoothed curve. Gaussian (bell-curve) and Epanechnikov are common choices with different smoothing properties.</span></span></td>
+              <td>${kdeProps.kernelType}</td>
+            </tr>
+            <tr>
+              <td><strong>Optimal Bandwidth:</strong><span class="info-tooltip">i<span class="info-tooltip-text">The statistically recommended smoothing parameter calculated using Silverman's rule. This balances between over- and under-smoothing for typical data.</span></span></td>
+              <td>${kdeProps.silvermanBandwidth.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td><strong>Current Bandwidth:</strong><span class="info-tooltip">i<span class="info-tooltip-text">The current smoothing parameter value being used. Higher values create a smoother curve but may hide details; lower values show more detail but may display noise.</span></span></td>
+              <td>${kdeProps.currentBandwidth.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td><strong>Relative Smoothing:</strong><span class="info-tooltip">i<span class="info-tooltip-text">The ratio of current bandwidth to optimal bandwidth. Values close to 1.0 indicate near-optimal smoothing based on Silverman's rule. This metric helps you gauge if you're over-smoothing (>1.0, hiding potential features) or under-smoothing (<1.0, potentially showing noise as signal). It's a quality indicator for your visualization.</span></span></td>
+              <td>${kdeProps.relativeSmoothing.toFixed(2)}x</td>
+            </tr>
+            <tr style="color: ${
+              kdeProps.relativeSmoothing > 4 || kdeProps.relativeSmoothing < 0.6
+                ? 'var(--error-color)'
+                : 'var(--text-color)'
+            }">
+              <td><strong>Assessment:</strong><span class="info-tooltip">i<span class="info-tooltip-text">Evaluation of the current smoothness level compared to optimal. Both over-smoothing and under-smoothing can hide important aspects of the data.</span></span></td>
+              <td>${kdeProps.smoothnessAssessment}</td>
+            </tr>
+          </table>
+        `;
+
+        document.getElementById('kdeProperties').innerHTML = kdeHtml;
+      }
+
+      /**
+       * Updates the slider UI without triggering events
+       * @param {number} value - Value to set the slider to
+       */
+      function updateSliderUI(value) {
+        const slider = document.getElementById('bandwidthSlider');
+        slider.min = Math.max(0.1, value * 0.1);
+        slider.max = value * 5;
+        slider.value = value;
+        slider.step = Math.max(0.01, value / 100);
+        document.getElementById('bandwidthValue').textContent =
+          value.toFixed(1);
+      }
+
+      /**
+       * Show a toast notification
+       * @param {string} message - Message to display
+       * @param {string} type - Type of notification ('info', 'error', 'success')
+       */
+      function showToast(message, type = 'info') {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+
+        // Set color based on type
+        if (type === 'error') {
+          toast.style.borderLeftColor = 'var(--error-color)';
+        } else if (type === 'success') {
+          toast.style.borderLeftColor = 'var(--success-color)';
+        } else {
+          toast.style.borderLeftColor = 'var(--accent-color)';
+        }
+
+        toast.className = 'show';
+
+        // After 3 seconds, hide the toast
+        setTimeout(() => {
+          toast.className = toast.className.replace('show', '');
+        }, 3000);
+      }
+
+      // =============================================================
+      // EVENT HANDLERS & USER INTERACTION
+      // =============================================================
+
+      /**
+       * Generate random data for demonstration
+       * This function creates a mixture of normal distributions
+       * to show interesting multimodal data for KDE exploration
+       */
+      function generateRandomData() {
+        // Number of data points and component distributions
+        const n = 300;
+        const components = [
+          { mean: 30, stdDev: 5, weight: 0.4 },
+          { mean: 50, stdDev: 7, weight: 0.3 },
+          { mean: 70, stdDev: 3, weight: 0.3 },
+        ];
+
+        const data = [];
+
+        // Generate data from mixture of normal distributions
+        for (let i = 0; i < n; i++) {
+          // Randomly select which component to sample from
+          const r = Math.random();
+          let cumulativeWeight = 0;
+          let selectedComponent;
+
+          for (const component of components) {
+            cumulativeWeight += component.weight;
+            if (r <= cumulativeWeight) {
+              selectedComponent = component;
+              break;
+            }
+          }
+
+          // Box-Muller transform to generate normal random variables
+          const u1 = Math.random();
+          const u2 = Math.random();
+          const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+
+          // Transform to desired mean and standard deviation
+          const value = z * selectedComponent.stdDev + selectedComponent.mean;
+          data.push(Math.round(value));
+        }
+
+        // Update the textarea and chart
+        document.getElementById('dataInput').value = JSON.stringify(data);
+
+        // Show a toast notification
+        showToast('Generated random multimodal data', 'success');
+
+        // Update the chart with new data
+        updateChart();
+      }
+
+      /**
+       * Handler for the Update Chart button
+       * Parses data and updates the chart
+       */
+      function updateChart() {
+        try {
+          // Parse raw data from textarea
+          const dataInput = document.getElementById('dataInput').value.trim();
+          rawData = JSON.parse(dataInput);
+
+          // Validate data is an array of numbers
+          if (
+            !Array.isArray(rawData) ||
+            rawData.some((val) => typeof val !== 'number')
+          ) {
+            throw new Error('Data must be an array of numbers');
+          }
+
+          if (rawData.length < 2) {
+            throw new Error('At least two data points are required');
+          }
+
+          // Clear previous errors
+          const errorMessage = document.getElementById('error-message');
+          errorMessage.textContent = '';
+          errorMessage.style.display = 'none';
+
+          // Calculate optimal bandwidth using Silverman's rule
+          defaultBandwidth = calculateSilvermanBandwidth(rawData);
+
+          // If user hasn't manually adjusted bandwidth, use the optimal value
+          if (!userAdjustedBandwidth) {
+            bandwidth = defaultBandwidth;
+            // Update the slider to match the optimal bandwidth
+            updateSliderUI(defaultBandwidth);
+          }
+
+          // Draw the chart
+          drawChart(rawData, bandwidth);
+
+          // Update the information cards
+          updateDataSummaryCard();
+          updateKDEPropertiesCard();
+        } catch (error) {
+          const errorMessage = document.getElementById('error-message');
+          errorMessage.textContent = 'Error: ' + error.message;
+          errorMessage.style.display = 'block';
+          d3.select('#chart').html(''); // Clear chart on error
+        }
+      }
+
+      /**
+       * Toggle dark/light mode
+       */
+      function toggleDarkMode() {
+        const body = document.body;
+        const isDarkMode = body.classList.toggle('dark-mode');
+
+        // Update the toggle button icon
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        darkModeToggle.textContent = isDarkMode ? '🌙' : '🔆';
+
+        // Save preference to localStorage
+        localStorage.setItem('darkMode', isDarkMode ? 'enabled' : 'disabled');
+
+        // Redraw the chart if data exists
+        if (rawData.length > 0) {
+          drawChart(rawData, bandwidth);
+        }
+      }
+
+      /**
+       * Initialize MathJax for rendering LaTeX
+       */
+      function initMathJax() {
+        if (window.MathJax) {
+          // Configure MathJax
+          window.MathJax = {
+            tex: {
+              inlineMath: [
+                ['$', '$'],
+                ['\\(', '\\)'],
+              ],
+              displayMath: [
+                ['$$', '$$'],
+                ['\\[', '\\]'],
+              ],
+              processEscapes: true,
+            },
+            svg: {
+              fontCache: 'global',
+            },
+            options: {
+              renderActions: {
+                addMenu: [], // Remove right-click menu on formulas
+                checkLoading: [],
+              },
+            },
+          };
+
+          // Process math when page is loaded
+          if (typeof window.MathJax.typesetPromise === 'function') {
+            window.MathJax.typesetPromise();
+          }
+        } else {
+          // If MathJax isn't loaded yet, try again in a moment
+          setTimeout(initMathJax, 250);
+        }
+      }
+
+      // =============================================================
+      // INITIALIZATION & EVENT LISTENERS
+      // =============================================================
+
+      // Initialize the app on page load
+      document.addEventListener('DOMContentLoaded', () => {
+        // Update the bandwidth slider value text
+        document.getElementById('bandwidthValue').textContent =
+          document.getElementById('bandwidthSlider').value;
+
+        // Add the bandwidth slider event listener
+        document
+          .getElementById('bandwidthSlider')
+          .addEventListener('input', function () {
+            const value = parseFloat(this.value);
+            document.getElementById('bandwidthValue').textContent =
+              value.toFixed(1);
+            bandwidth = value;
+            userAdjustedBandwidth = true; // User has adjusted the bandwidth
+
+            // Immediately update the chart when slider changes
+            drawChart(rawData, bandwidth);
+            updateKDEPropertiesCard();
+          });
+
+        // Add event listener for kernel function toggle button
+        document
+          .getElementById('kernelToggle')
+          .addEventListener('change', function () {
+            selectedKernel = this.checked ? 'epanechnikov' : 'gaussian';
+            // Update the chart with the new kernel function
+            drawChart(rawData, bandwidth);
+            // Update KDE properties card to show the selected kernel
+            updateKDEPropertiesCard();
+          });
+
+        // Set up dark mode toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const prefersDarkMode = window.matchMedia(
+          '(prefers-color-scheme: dark)'
+        ).matches;
+
+        // Check for saved preference or use system preference
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark' || (savedTheme === null && prefersDarkMode)) {
+          document.body.classList.add('dark-mode');
+          darkModeToggle.textContent = '🌙';
+        } else {
+          darkModeToggle.textContent = '🔆';
+        }
+
+        darkModeToggle.addEventListener('click', toggleDarkMode);
+
+        // Initialize MathJax for formula rendering
+        initMathJax();
+
+        // Initial chart update
+        updateChart();
+      });
+
+      // Handle window resize
+      window.addEventListener('resize', () => {
+        if (rawData.length > 0) {
+          drawChart(rawData, bandwidth);
+        }
+      });
+    </script>
+
+    <footer>
+      <div class="author-info">
+        Created by <span class="author-name">Przemyslaw Pierzchalka</span> with
+        <span class="author-name">GitHub Copilot</span>
+      </div>
+    </footer>
+  </body>
+</html>
