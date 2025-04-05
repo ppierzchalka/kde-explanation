@@ -1,0 +1,2386 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Categorical KDE Implementation Guide</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Add MathJax for LaTeX rendering -->
+    <script
+      type="text/javascript"
+      id="MathJax-script"
+      async
+      src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+    ></script>
+    <style>
+      :root {
+        --background-color: #f9f9fb;
+        --text-color: #2b2d42;
+        --card-bg: #ffffff;
+        --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        --accent-color: #4361ee;
+        --secondary-accent: #3f37c9;
+        --border-color: #e0e0e0;
+        --chart-grid: #e9ecef;
+        --histogram-color: #4361ee;
+        --kde-color-approach1: #ef476f;
+        --kde-color-approach2: #06d6a0;
+        --kde-fill-approach1: rgba(239, 71, 111, 0.2);
+        --kde-fill-approach2: rgba(6, 214, 160, 0.2);
+        --input-bg: #ffffff;
+        --button-hover: #3a56d4;
+        --card-radius: 12px;
+        --success-color: #06d6a0;
+        --error-color: #d90429;
+        --warning-color: #ffd166;
+      }
+
+      /* Dark Mode Variables */
+      .dark-mode {
+        --background-color: #1a1b25;
+        --text-color: #f8f9fa;
+        --card-bg: #2b2d42;
+        --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.24);
+        --accent-color: #4895ef;
+        --secondary-accent: #4cc9f0;
+        --border-color: #4b4b6a;
+        --chart-grid: #3c3d54;
+        --histogram-color: #4895ef;
+        --kde-color-approach1: #ff5e78;
+        --kde-color-approach2: #0cce9e;
+        --kde-fill-approach1: rgba(255, 94, 120, 0.2);
+        --kde-fill-approach2: rgba(12, 206, 158, 0.2);
+        --input-bg: #242535;
+        --button-hover: #3a75b0;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+          Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--background-color);
+        color: var(--text-color);
+        line-height: 1.6;
+        transition: background-color 0.3s ease, color 0.3s ease;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 32px;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 16px;
+      }
+
+      .app-title {
+        font-size: 28px;
+        font-weight: 700;
+        margin: 0;
+        color: var(--accent-color);
+      }
+
+      .header-controls {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .dark-mode-toggle {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+      }
+
+      .dark-mode-toggle:hover {
+        transform: rotate(30deg);
+      }
+
+      .main-content {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 32px;
+      }
+
+      @media (max-width: 1100px) {
+        .main-content {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      h1,
+      h2,
+      h3 {
+        color: var(--accent-color);
+        margin-top: 0;
+      }
+
+      h1 {
+        font-size: 28px;
+        margin-bottom: 24px;
+      }
+
+      h2 {
+        font-size: 22px;
+        font-weight: 600;
+      }
+
+      h3 {
+        font-size: 18px;
+        font-weight: 500;
+        margin-bottom: 12px;
+      }
+
+      .control-panel {
+        background-color: var(--card-bg);
+        border-radius: var(--card-radius);
+        box-shadow: var(--card-shadow);
+        padding: 24px;
+        margin-bottom: 24px;
+        transition: box-shadow 0.3s ease;
+      }
+
+      .control-panel:hover {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      }
+
+      .charts-container {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+        width: 100%;
+      }
+
+      .chart-container {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 calc(50% - 16px); /* 50% width minus half the gap */
+        min-width: 300px; /* Minimum width before wrapping */
+        max-width: calc(50% - 16px); /* Ensure it doesn't grow beyond 50% */
+        background-color: var(--card-bg);
+        border-radius: var(--card-radius);
+        box-shadow: var(--card-shadow);
+        padding: 24px;
+        transition: box-shadow 0.3s ease;
+        position: relative; /* This ensures absolute positioned children are relative to this container */
+        overflow: hidden; /* Prevent content overflow */
+      }
+
+      @media (max-width: 1200px) {
+        .chart-container {
+          flex: 1 1 100%;
+          max-width: 100%;
+        }
+      }
+
+      .chart {
+        width: 100%;
+        height: 400px;
+        margin-top: 16px;
+      }
+
+      .description {
+        font-size: 16px;
+        margin-bottom: 16px;
+        color: var(--text-color);
+        opacity: 0.8;
+      }
+
+      .control-row {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 20px;
+        gap: 24px;
+      }
+
+      .input-group {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+      }
+
+      label {
+        font-weight: 500;
+        display: block;
+        margin-bottom: 8px;
+      }
+
+      textarea,
+      input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background-color: var(--input-bg);
+        color: var(--text-color);
+        font-family: monospace;
+        font-size: 14px;
+        transition: border-color 0.3s;
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 100px;
+      }
+
+      textarea:focus,
+      input:focus {
+        outline: none;
+        border-color: var(--accent-color);
+      }
+
+      .output-display {
+        background-color: var(--input-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 12px;
+        font-family: monospace;
+        font-size: 14px;
+        margin-top: 10px;
+        max-height: 150px;
+        overflow-y: auto;
+        color: var(--text-color);
+      }
+
+      .data-button {
+        padding: 10px 16px;
+        background-color: var(--accent-color);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: background-color 0.3s;
+      }
+
+      .data-button:hover {
+        background-color: var(--button-hover);
+      }
+
+      .slider-container {
+        flex-grow: 1;
+      }
+
+      .slider-with-value {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .slider-value {
+        font-family: monospace;
+        min-width: 40px;
+        text-align: right;
+      }
+
+      input[type='range'] {
+        width: 100%;
+      }
+
+      .kernel-selector {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-top: 20px; /* Add margin to match other elements */
+        height: 34px; /* Match the height of the slider to ensure vertical alignment */
+      }
+
+      .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 100px; /* Increased width to be much bigger than the circle */
+        height: 40px; /* Slightly increased height */
+        margin: 0 10px; /* Add margin to space between labels and toggle */
+      }
+
+      .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--background-color);
+        border: 1px solid var(--border-color);
+        transition: 0.4s;
+        border-radius: 34px;
+      }
+
+      .toggle-slider:before {
+        position: absolute;
+        content: '';
+        height: 26px;
+        width: 26px;
+        left: 7px;
+        bottom: 7px;
+        background-color: var(--accent-color);
+        transition: 0.4s;
+        border-radius: 50%;
+        z-index: 1;
+      }
+
+      .toggle-labels {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 200px; /* Increased total width for better spacing */
+      }
+
+      .toggle-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-color);
+        opacity: 0.8;
+        transition: opacity 0.3s, color 0.3s;
+        flex: 0 0 auto; /* Prevent shrinking */
+        white-space: nowrap; /* Prevent text wrapping */
+      }
+
+      .toggle-label.active {
+        opacity: 1;
+        color: var(--accent-color);
+        font-weight: 600;
+      }
+
+      input:checked + .toggle-slider:before {
+        transform: translateX(65px); /* Adjusted to match the wider toggle */
+      }
+
+      /* Theme toggle */
+      .theme-toggle {
+        background: none;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        padding: 8px;
+        border-radius: 50%;
+        color: var(--text-color);
+        background-color: rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+      }
+
+      .dark-mode .theme-toggle {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .theme-toggle:hover {
+        background-color: var(--accent-color);
+        color: white;
+        transform: rotate(20deg);
+      }
+
+      .kde-info {
+        background-color: var(--input-bg);
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 15px;
+        font-size: 14px;
+      }
+
+      table.kde-props {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      table.kde-props td {
+        padding: 6px 0;
+        border-bottom: 1px dashed var(--border-color);
+      }
+
+      table.kde-props td:first-child {
+        font-weight: 500;
+        width: 60%;
+      }
+
+      table.kde-props td:last-child {
+        text-align: right;
+        font-family: monospace;
+      }
+
+      .axis path,
+      .axis line {
+        stroke: var(--border-color);
+      }
+
+      .axis text {
+        font-size: 12px;
+        fill: var(--text-color);
+      }
+
+      .error-message {
+        background-color: var(--error-color);
+        color: white;
+        padding: 10px 16px;
+        border-radius: 6px;
+        margin-top: 16px;
+        display: none;
+        font-weight: 500;
+        animation: fadeIn 0.3s;
+      }
+
+      .tooltip {
+        position: absolute;
+        background-color: var(--card-bg);
+        border-radius: 4px;
+        padding: 10px;
+        font-size: 14px;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s;
+        box-shadow: var(--card-shadow);
+      }
+
+      .bar {
+        fill: var(--histogram-color);
+        opacity: 0.7;
+      }
+
+      .kde-stepped {
+        fill: none;
+        stroke: var(--kde-color-approach1);
+        stroke-width: 2.5;
+      }
+
+      .kde {
+        fill: none;
+        stroke: var(--kde-color-approach2);
+        stroke-width: 2.5;
+      }
+
+      .legend {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 30px;
+        margin-top: 20px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .legend-color {
+        width: 16px;
+        height: 3px;
+        display: inline-block;
+      }
+
+      /* Implementation steps styling */
+      .implementation-steps {
+        margin-top: 24px;
+        padding: 16px;
+        border-left: 3px solid var(--accent-color);
+        background-color: rgba(67, 97, 238, 0.05);
+      }
+
+      .implementation-steps ol {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      .implementation-steps ul {
+        padding-left: 20px;
+        margin: 6px 0 10px 0;
+      }
+
+      .implementation-steps li {
+        margin-bottom: 8px;
+      }
+
+      .implementation-steps li:last-child {
+        margin-bottom: 0;
+      }
+
+      .formula-container {
+        background-color: rgba(67, 97, 238, 0.05);
+        border-left: 3px solid var(--accent-color);
+        padding: 16px;
+        margin: 16px 0;
+        font-family: 'Georgia', serif;
+        overflow-x: auto;
+      }
+
+      /* Add styling for MathJax formulas */
+      .mjx-chtml {
+        margin: 10px 0;
+        font-size: 110% !important;
+      }
+
+      /* Toast notifications */
+      #toast {
+        visibility: hidden;
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        border-left: 4px solid var(--accent-color);
+        padding: 16px 24px;
+        border-radius: 4px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 100;
+      }
+
+      #toast.show {
+        visibility: visible;
+        animation: fadein 0.5s, fadeout 0.5s 2.5s;
+      }
+
+      @keyframes fadein {
+        from {
+          bottom: 0;
+          opacity: 0;
+        }
+        to {
+          bottom: 30px;
+          opacity: 1;
+        }
+      }
+
+      @keyframes fadeout {
+        from {
+          bottom: 30px;
+          opacity: 1;
+        }
+        to {
+          bottom: 0;
+          opacity: 0;
+        }
+      }
+
+      .data-table-container {
+        margin-top: 24px;
+      }
+
+      .data-table-wrapper {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+      }
+
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+
+      .data-table th,
+      .data-table td {
+        padding: 8px 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .data-table th {
+        background-color: rgba(67, 97, 238, 0.1);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        box-shadow: 0 1px 0 var(--border-color);
+      }
+
+      .data-table tr:nth-child(even) {
+        background-color: rgba(0, 0, 0, 0.02);
+      }
+
+      .data-table tr:hover {
+        background-color: rgba(67, 97, 238, 0.05);
+      }
+
+      footer {
+        margin-top: 40px;
+        padding: 20px 0;
+        text-align: center;
+        border-top: 1px solid var(--border-color);
+        color: var(--text-color);
+        opacity: 0.8;
+        transition: opacity 0.3s;
+      }
+
+      footer:hover {
+        opacity: 1;
+      }
+
+      /* Content container for proper centering and margins */
+      .page-container {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        width: 100%;
+        overflow-x: hidden;
+      }
+
+      .content-container {
+        max-width: 1600px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 40px;
+        box-sizing: border-box;
+      }
+
+      /* Make charts container display items side by side */
+      .charts-container {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 32px;
+        width: 100%;
+      }
+
+      .chart-container {
+        flex: 0 0 calc(50% - 16px);
+        max-width: calc(50% - 16px);
+        background-color: var(--card-bg);
+        border-radius: var(--card-radius);
+        box-shadow: var(--card-shadow);
+        padding: 24px;
+        transition: box-shadow 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        box-sizing: border-box;
+      }
+
+      @media (max-width: 1200px) {
+        .chart-container {
+          flex: 0 0 100%;
+          max-width: 100%;
+        }
+      }
+
+      /* Award Badge/Stamp styling */
+      .award-badge {
+        position: absolute;
+        top: 5px; /* Adjusted to make it fully visible */
+        right: 20px;
+        width: 60px; /* Smaller width */
+        height: 60px; /* Smaller height */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: rgba(6, 214, 160, 0.1);
+        border: 1px solid rgba(6, 214, 160, 0.3);
+        color: var(--kde-color-approach2);
+        font-weight: 500;
+        text-align: center;
+        transform: rotate(10deg);
+        z-index: 10;
+        font-size: 10px; /* Smaller font size */
+        padding: 6px 4px; /* Smaller padding */
+      }
+
+      .award-badge .badge-icon {
+        font-size: 14px; /* Smaller icon */
+        margin-bottom: 1px;
+      }
+
+      .award-badge .badge-title {
+        font-size: 8px; /* Smaller title text */
+        margin-bottom: 1px;
+        white-space: nowrap;
+      }
+
+      .award-badge .badge-subtitle {
+        font-size: 7px; /* Smaller subtitle text */
+      }
+
+      .kernel-row {
+        margin-top: 24px;
+        display: flex;
+        justify-content: center;
+      }
+
+      .toggle-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        width: 300px;
+      }
+
+      .toggle-switch {
+        position: relative;
+        width: 60px;
+        height: 34px;
+        margin: 0 10px;
+      }
+
+      .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        margin: 0;
+      }
+
+      .toggle-track {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--background-color);
+        border: 1px solid var(--border-color);
+        border-radius: 34px;
+        transition: all 0.4s ease;
+      }
+
+      .toggle-track:before {
+        position: absolute;
+        content: '';
+        height: 26px;
+        width: 26px;
+        left: 4px; /* Position it 4px from the left when unchecked */
+        top: 50%; /* Center vertically */
+        transform: translateY(-50%); /* Perfect vertical centering */
+        background-color: var(--accent-color);
+        border-radius: 50%;
+        transition: transform 0.4s ease;
+      }
+
+      input:checked + .toggle-track:before {
+        /* Move exactly the width of the track minus the width of the circle minus the margins */
+        transform: translateX(26px) translateY(-50%);
+      }
+
+      .toggle-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-color);
+        opacity: 0.8;
+        cursor: pointer;
+        user-select: none;
+        transition: opacity 0.3s, color 0.3s;
+      }
+
+      .toggle-label.active {
+        opacity: 1;
+        color: var(--accent-color);
+        font-weight: 600;
+      }
+
+      .nav-link {
+        color: white;
+        background-color: var(--accent-color);
+        text-decoration: none;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .nav-link:hover {
+        background-color: var(--button-hover);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      /* Making sure the header controls display properly */
+      .header-controls {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-container">
+      <div class="content-container">
+        <header>
+          <h1 class="app-title">KDE with Categorical Histogram</h1>
+          <div class="header-controls">
+            <a href="index.html" class="nav-link">
+              <span>← Theory</span>
+            </a>
+            <button
+              id="themeToggle"
+              class="theme-toggle"
+              title="Toggle dark mode"
+            >
+              <span id="themeIcon">🌙</span>
+            </button>
+          </div>
+        </header>
+
+        <div class="control-panel">
+          <h3>Input Data</h3>
+          <div class="control-row">
+            <div class="input-group">
+              <label for="dataInput">Raw Data (JSON array format)</label>
+              <textarea
+                id="dataInput"
+                placeholder="[1, 2, 3, 4, 5, ...]"
+              ></textarea>
+              <div id="dataInfo" class="description"></div>
+            </div>
+          </div>
+
+          <h3>Bucketed Data Preview</h3>
+          <div id="bucketedDataPreview" class="output-display">
+            Buckets will appear here after processing the raw data
+          </div>
+
+          <div class="control-row" style="margin-top: 15px">
+            <button id="updateButton" class="data-button">Update Charts</button>
+            <button id="generateData" class="data-button">
+              Generate Sample Data
+            </button>
+          </div>
+
+          <div class="control-row">
+            <div class="slider-container">
+              <label for="bandwidthSlider"
+                >Bandwidth (Smoothing Parameter)</label
+              >
+              <div class="slider-with-value">
+                <input
+                  type="range"
+                  id="bandwidthSlider"
+                  min="0.5"
+                  max="15"
+                  step="0.1"
+                  value="3.5"
+                />
+                <span id="bandwidthValue" class="slider-value">3.5</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-row kernel-row">
+            <div class="toggle-container">
+              <span class="toggle-label" id="gaussianLabel">Gaussian</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="kernelToggle" />
+                <span class="toggle-track"></span>
+              </label>
+              <span class="toggle-label" id="epanechnikovLabel"
+                >Epanechnikov</span
+              >
+            </div>
+          </div>
+
+          <div id="kde-info" class="kde-info">
+            <table class="kde-props">
+              <tr>
+                <td>Optimal Bandwidth (Silverman's rule)</td>
+                <td id="optimal-bw">-</td>
+              </tr>
+              <tr>
+                <td>Current Bandwidth</td>
+                <td id="current-bw">-</td>
+              </tr>
+              <tr>
+                <td>Relative Smoothing</td>
+                <td id="relative-smoothing">-</td>
+              </tr>
+              <tr>
+                <td>Assessment</td>
+                <td id="smoothness-assessment">-</td>
+              </tr>
+            </table>
+          </div>
+
+          <div id="error-message" class="error-message"></div>
+        </div>
+
+        <div class="charts-container">
+          <div class="chart-container">
+            <h2>Approach 1: KDE Values Mapped to Bucket Centers</h2>
+            <div class="description">
+              This approach calculates a KDE on the raw data, then maps each KDE
+              value to the appropriate bucket center. This ensures the KDE
+              points align perfectly with the categorical x-axis of your
+              histogram.
+            </div>
+            <div class="chart" id="chart1"></div>
+            <div class="legend">
+              <div class="legend-item">
+                <div
+                  class="legend-color"
+                  style="background-color: var(--histogram-color); height: 12px"
+                ></div>
+                <span>Histogram</span>
+              </div>
+              <div class="legend-item">
+                <div
+                  class="legend-color"
+                  style="background-color: var(--kde-color-approach1)"
+                ></div>
+                <span>Bucket-Mapped KDE</span>
+              </div>
+            </div>
+            <div class="data-table-container">
+              <h3>Data Table</h3>
+              <div class="data-table-wrapper">
+                <table class="data-table" id="data-table-1">
+                  <thead>
+                    <tr>
+                      <th>Bucket</th>
+                      <th>Count</th>
+                      <th>KDE Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- This will be populated by JavaScript -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="implementation-steps">
+              <h3>
+                Implementation Steps - Approach 1: Direct Bucket Center KDE
+              </h3>
+              <ol>
+                <li>
+                  <strong>Input Data Options:</strong>
+                  <ul>
+                    <li>
+                      Option A: Pre-bucketed histogram data:
+                      <code
+                        >[{label: '4000-4100', x0: 4000, x1: 4100, count: 42},
+                        ...]</code
+                      >
+                    </li>
+                    <li>
+                      Option B: Grouped/aggregated raw data:
+                      <code>[4050, 4075, 4031, 5012, ...]</code>
+                    </li>
+                  </ul>
+                </li>
+                <li>
+                  <strong
+                    >Prepare Bucket Data (if starting with raw data):</strong
+                  >
+                  <pre><code>function createBuckets(rawData) {
+  // Calculate optimal bucket count using square root rule
+  const bucketCount = Math.ceil(Math.sqrt(rawData.length));
+
+  // Find min/max values
+  const minValue = Math.min(...rawData);
+  const maxValue = Math.max(...rawData);
+  
+  // Calculate consistent bucket width
+  const bucketWidth = Math.ceil((maxValue - minValue) / bucketCount);
+  
+  // Initialize empty buckets
+  const buckets = [];
+  for (let i = 0; i < bucketCount; i++) {
+    const x0 = minValue + (i * bucketWidth);
+    const x1 = minValue + ((i + 1) * bucketWidth);
+    buckets.push({
+      label: `${x0}-${x1}`,
+      x0: x0,
+      x1: x1,
+      count: 0
+    });
+  }
+  
+  // Add data points to buckets
+  rawData.forEach(value => {
+    for (const bucket of buckets) {
+      if (value >= bucket.x0 && value < bucket.x1) {
+        bucket.count++;
+        break;
+      }
+    }
+  });
+  
+  return buckets;
+}</code></pre>
+                </li>
+                <li>
+                  <strong>Calculate Optimal Bandwidth:</strong>
+                  <pre><code>function calculateSilvermanBandwidth(data) {
+  // Calculate mean
+  const sum = data.reduce((acc, val) => acc + val, 0);
+  const mean = sum / data.length;
+  
+  // Calculate standard deviation
+  const squaredDiffs = data.map(val => Math.pow(val - mean, 2));
+  const variance = squaredDiffs.reduce((acc, val) => acc + val, 0) / data.length;
+  const stdDev = Math.sqrt(variance);
+  
+  // Calculate IQR (Interquartile Range)
+  const sorted = [...data].sort((a, b) => a - b);
+  const q1Index = Math.floor(sorted.length * 0.25);
+  const q3Index = Math.floor(sorted.length * 0.75);
+  const q1 = sorted[q1Index];
+  const q3 = sorted[q3Index];
+  const iqr = q3 - q1;
+  
+  // Use minimum of stdDev and IQR/1.34 (robust estimate)
+  const sigma = Math.min(stdDev, iqr / 1.34);
+  
+  // Silverman's rule: 0.9 * sigma * n^(-0.2)
+  return 0.9 * sigma * Math.pow(data.length, -0.2);
+}</code></pre>
+                </li>
+                <li>
+                  <strong>Create Kernel Functions:</strong>
+                  <pre><code>// Gaussian kernel function
+function gaussianKernel(bandwidth) {
+  return function(u) {
+    // Standard normal density function scaled by bandwidth
+    return (1 / (Math.sqrt(2 * Math.PI) * bandwidth)) * 
+           Math.exp(-0.5 * Math.pow(u / bandwidth, 2));
+  };
+}
+
+// Epanechnikov kernel function
+function epanechnikovKernel(bandwidth) {
+  return function(u) {
+    const scaledU = u / bandwidth;
+    if (Math.abs(scaledU) <= 1) {
+      return (0.75 * (1 - Math.pow(scaledU, 2))) / bandwidth;
+    } else {
+      return 0;
+    }
+  };
+}</code></pre>
+                </li>
+                <li>
+                  <strong>Calculate KDE at Bucket Centers:</strong>
+                  <pre><code>function calculateBucketKDE(buckets, rawData, bandwidth, kernelType = 'gaussian') {
+  // Select kernel function based on type
+  const kernel = kernelType === 'gaussian' ? 
+    gaussianKernel(bandwidth) : 
+    epanechnikovKernel(bandwidth);
+  
+  // Calculate KDE at each bucket center
+  return buckets.map(bucket => {
+    // Calculate the center point of the bucket
+    const center = (bucket.x0 + bucket.x1) / 2;
+    
+    // Apply kernel density estimation at the center point
+    let densitySum = 0;
+    for (const point of rawData) {
+      // Calculate kernel contribution of this data point
+      densitySum += kernel(center - point);
+    }
+    
+    // Normalize by number of points (not necessary for normalized kernel)
+    const density = densitySum / rawData.length;
+    
+    return {
+      label: bucket.label,
+      x: center,
+      density: density
+    };
+  });
+}</code></pre>
+                </li>
+                <li>
+                  <strong>Generate Final Result Dataset:</strong>
+                  <pre><code>function generateKDEDataset(buckets, rawData, bandwidth, kernelType) {
+  // If bandwidth not provided, calculate using Silverman's rule
+  if (!bandwidth) {
+    bandwidth = calculateSilvermanBandwidth(rawData);
+  }
+  
+  // Calculate KDE points
+  const kdePoints = calculateBucketKDE(buckets, rawData, bandwidth, kernelType);
+  
+  // Combine histogram and KDE data into single result dataset
+  return buckets.map((bucket, i) => ({
+    label: bucket.label,
+    count: bucket.count,
+    x: kdePoints[i].x,
+    density: kdePoints[i].density
+  }));
+}</code></pre>
+                </li>
+                <li>
+                  <strong>Example Usage:</strong>
+                  <pre><code>// Example with raw data
+const rawData = [4050, 4075, 4031, 5012, ...]; // Your aggregated query results
+const buckets = createBuckets(rawData);
+const bandwidth = calculateSilvermanBandwidth(rawData);
+const result = generateKDEDataset(buckets, rawData, bandwidth, 'gaussian');
+
+// Example with pre-bucketed data
+const bucketedData = [
+  {label: '4000-4100', x0: 4000, x1: 4100, count: 42},
+  {label: '4100-4200', x0: 4100, x1: 4200, count: 36},
+  // ...more buckets
+];
+// Note: still need rawData for KDE calculation
+const result = generateKDEDataset(bucketedData, rawData, bandwidth, 'gaussian');</code></pre>
+                </li>
+              </ol>
+              <p>
+                This approach calculates KDE values exactly at bucket center
+                points, producing one KDE value for each histogram bucket. The
+                result can be visualized using your existing chart library with
+                a categorical x-axis.
+              </p>
+            </div>
+          </div>
+
+          <div class="chart-container">
+            <h2>Approach 2: Dual Axis Overlay</h2>
+            <div class="award-badge">
+              <div class="badge-icon">✓</div>
+              <div class="badge-title">MATHEMATICALLY CORRECT</div>
+              <div class="badge-subtitle">Properly normalized</div>
+            </div>
+            <div class="description">
+              This approach overlays a true continuous KDE on the categorical
+              histogram by aligning the continuous x values with the categorical
+              bucket positions. The KDE has the same number of data points as
+              histogram buckets.
+            </div>
+            <div class="chart" id="chart2"></div>
+            <div class="legend">
+              <div class="legend-item">
+                <div
+                  class="legend-color"
+                  style="background-color: var(--histogram-color); height: 12px"
+                ></div>
+                <span>Histogram</span>
+              </div>
+              <div class="legend-item">
+                <div
+                  class="legend-color"
+                  style="background-color: var(--kde-color-approach2)"
+                ></div>
+                <span>True KDE</span>
+              </div>
+            </div>
+            <div class="data-table-container">
+              <h3>Data Table</h3>
+              <div class="data-table-wrapper">
+                <table class="data-table" id="data-table-2">
+                  <thead>
+                    <tr>
+                      <th>Bucket</th>
+                      <th>Count</th>
+                      <th>KDE Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- This will be populated by JavaScript -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="implementation-steps">
+              <h3>
+                Implementation Steps - Approach 2: Normalized Bucket Center KDE
+              </h3>
+              <ol>
+                <li>
+                  <strong>Input Data Options:</strong>
+                  <ul>
+                    <li>
+                      Option A: Pre-bucketed histogram data:
+                      <code
+                        >[{label: '4000-4100', x0: 4000, x1: 4100, count: 42},
+                        ...]</code
+                      >
+                    </li>
+                    <li>
+                      Option B: Grouped/aggregated raw data:
+                      <code>[4050, 4075, 4031, 5012, ...]</code>
+                    </li>
+                  </ul>
+                </li>
+                <li>
+                  <strong
+                    >Prepare Bucket Data (if starting with raw data):</strong
+                  >
+                  <pre><code>function createBuckets(rawData) {
+  // Same bucket creation function as in Approach 1
+  // Calculate optimal bucket count using square root rule
+  const bucketCount = Math.ceil(Math.sqrt(rawData.length));
+
+  // Find min/max values
+  const minValue = Math.min(...rawData);
+  const maxValue = Math.max(...rawData);
+  
+  // Calculate consistent bucket width
+  const bucketWidth = Math.ceil((maxValue - minValue) / bucketCount);
+  
+  // Initialize empty buckets
+  const buckets = [];
+  for (let i = 0; i < bucketCount; i++) {
+    const x0 = minValue + (i * bucketWidth);
+    const x1 = minValue + ((i + 1) * bucketWidth);
+    buckets.push({
+      label: `${x0}-${x1}`,
+      x0: x0,
+      x1: x1,
+      count: 0
+    });
+  }
+  
+  // Add data points to buckets
+  rawData.forEach(value => {
+    for (const bucket of buckets) {
+      if (value >= bucket.x0 && value < bucket.x1) {
+        bucket.count++;
+        break;
+      }
+    }
+  });
+  
+  return buckets;
+}</code></pre>
+                </li>
+                <li>
+                  <strong>Calculate Optimal Bandwidth:</strong>
+                  <pre><code>function calculateSilvermanBandwidth(data) {
+  // Calculate mean
+  const sum = data.reduce((acc, val) => acc + val, 0);
+  const mean = sum / data.length;
+  
+  // Calculate standard deviation
+  const squaredDiffs = data.map(val => Math.pow(val - mean, 2));
+  const variance = squaredDiffs.reduce((acc, val) => acc + val, 0) / data.length;
+  const stdDev = Math.sqrt(variance);
+  
+  // Calculate IQR (Interquartile Range)
+  const sorted = [...data].sort((a, b) => a - b);
+  const q1Index = Math.floor(sorted.length * 0.25);
+  const q3Index = Math.floor(sorted.length * 0.75);
+  const q1 = sorted[q1Index];
+  const q3 = sorted[q3Index];
+  const iqr = q3 - q1;
+  
+  // Use minimum of stdDev and IQR/1.34 (robust estimate)
+  const sigma = Math.min(stdDev, iqr / 1.34);
+  
+  // Silverman's rule: 0.9 * sigma * n^(-0.2)
+  return 0.9 * sigma * Math.pow(data.length, -0.2);
+}</code></pre>
+                </li>
+                <li>
+                  <strong>Create Kernel Functions:</strong>
+                  <pre><code>// Gaussian kernel function
+function gaussianKernel(bandwidth) {
+  return function(u) {
+    // Standard normal density function scaled by bandwidth
+    return (1 / (Math.sqrt(2 * Math.PI) * bandwidth)) * 
+           Math.exp(-0.5 * Math.pow(u / bandwidth, 2));
+  };
+}
+
+// Epanechnikov kernel function
+function epanechnikovKernel(bandwidth) {
+  return function(u) {
+    const scaledU = u / bandwidth;
+    if (Math.abs(scaledU) <= 1) {
+      return (0.75 * (1 - Math.pow(scaledU, 2))) / bandwidth;
+    } else {
+      return 0;
+    }
+  };
+}</code></pre>
+                </li>
+                <li>
+                  <strong
+                    >Calculate KDE at Bucket Centers (same as Approach
+                    1):</strong
+                  >
+                  <pre><code>function calculateBucketKDE(buckets, rawData, bandwidth, kernelType = 'gaussian') {
+  // Select kernel function based on type
+  const kernel = kernelType === 'gaussian' ? 
+    gaussianKernel(bandwidth) : 
+    epanechnikovKernel(bandwidth);
+  
+  // Calculate KDE at each bucket center
+  return buckets.map(bucket => {
+    // Calculate the center point of the bucket
+    const center = (bucket.x0 + bucket.x1) / 2;
+    
+    // Apply kernel density estimation at the center point
+    let densitySum = 0;
+    for (const point of rawData) {
+      // Calculate kernel contribution of this data point
+      densitySum += kernel(center - point);
+    }
+    
+    // Normalize by number of points
+    const density = densitySum / rawData.length;
+    
+    return {
+      label: bucket.label,
+      x: center,
+      density: density
+    };
+  });
+}</code></pre>
+                </li>
+                <li>
+                  <strong>Normalize KDE Values (unique to Approach 2):</strong>
+                  <pre><code>function normalizeKdeValues(kdePoints) {
+  // Calculate area under the KDE curve using trapezoid rule
+  let totalArea = 0;
+  
+  for (let i = 1; i < kdePoints.length; i++) {
+    const current = kdePoints[i];
+    const previous = kdePoints[i-1];
+    
+    // Width between points
+    const width = current.x - previous.x;
+    
+    // Average height (trapezoid)
+    const avgHeight = (current.density + previous.density) / 2;
+    
+    // Area of this segment
+    const area = width * avgHeight;
+    
+    totalArea += area;
+  }
+  
+  // Normalize all points so area under curve approximately equals 1
+  return kdePoints.map(point => ({
+    label: point.label,
+    x: point.x,
+    density: point.density / totalArea
+  }));
+}</code></pre>
+                </li>
+                <li>
+                  <strong>Generate Final Result Dataset:</strong>
+                  <pre><code>function generateNormalizedKDEDataset(buckets, rawData, bandwidth, kernelType) {
+  // If bandwidth not provided, calculate using Silverman's rule
+  if (!bandwidth) {
+    bandwidth = calculateSilvermanBandwidth(rawData);
+  }
+  
+  // Calculate KDE points (same as Approach 1)
+  const kdePoints = calculateBucketKDE(buckets, rawData, bandwidth, kernelType);
+  
+  // Apply normalization (unique to Approach 2)
+  const normalizedPoints = normalizeKdeValues(kdePoints);
+  
+  // Combine histogram and normalized KDE data into single result dataset
+  return buckets.map((bucket, i) => ({
+    label: bucket.label,
+    count: bucket.count,
+    x: normalizedPoints[i].x,
+    density: normalizedPoints[i].density
+  }));
+}</code></pre>
+                </li>
+                <li>
+                  <strong>Example Usage:</strong>
+                  <pre><code>// Example with aggregated raw data
+const rawData = [4050, 4075, 4031, 5012, ...]; // Your aggregated query results
+const buckets = createBuckets(rawData);
+const bandwidth = calculateSilvermanBandwidth(rawData);
+const result = generateNormalizedKDEDataset(buckets, rawData, bandwidth, 'gaussian');
+
+// Example with pre-bucketed data
+const bucketedData = [
+  {label: '4000-4100', x0: 4000, x1: 4100, count: 42},
+  {label: '4100-4200', x0: 4100, x1: 4200, count: 36},
+  // ...more buckets
+];
+// Note: still need rawData for KDE calculation
+const result = generateNormalizedKDEDataset(bucketedData, rawData, bandwidth, 'gaussian');</code></pre>
+                </li>
+                <li>
+                  <strong>Key Differences from Approach 1:</strong>
+                  <ul>
+                    <li>
+                      Normalizes KDE values using the trapezoid rule to ensure
+                      area under curve = 1
+                    </li>
+                    <li>
+                      Provides proper probability density function
+                      characteristics
+                    </li>
+                    <li>
+                      Density values will be different, but pattern will be the
+                      same
+                    </li>
+                  </ul>
+                </li>
+              </ol>
+              <p>
+                Like Approach 1, this implementation calculates KDE at exactly
+                the same bucket center points, but adds normalization to ensure
+                statistical correctness. The result can be integrated with your
+                existing categorical-axis chart system.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tooltip" id="tooltip" style="opacity: 0"></div>
+    </div>
+
+    <script>
+      // Global variables & state
+      let rawData = [];
+      let bucketedData = [];
+      let bucketLabels = [];
+      let bandwidth = 3.5;
+      let defaultBandwidth = 3.5;
+      let selectedKernel = 'gaussian';
+
+      // DOM elements
+      const dataInput = document.getElementById('dataInput');
+      const bandwidthSlider = document.getElementById('bandwidthSlider');
+      const bandwidthValue = document.getElementById('bandwidthValue');
+      const updateButton = document.getElementById('updateButton');
+      const generateButton = document.getElementById('generateData');
+      const bucketedDataPreview = document.getElementById(
+        'bucketedDataPreview'
+      );
+      const tooltip = document.getElementById('tooltip');
+      const errorMessage = document.getElementById('error-message');
+
+      // Statistical functions
+      function calculateSilvermanBandwidth(data) {
+        // Calculate standard deviation
+        const mean = d3.mean(data);
+        const stdDev = Math.sqrt(
+          data.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) /
+            data.length
+        );
+
+        // Calculate IQR (Interquartile Range)
+        const sorted = [...data].sort(d3.ascending);
+        const q1 = d3.quantile(sorted, 0.25);
+        const q3 = d3.quantile(sorted, 0.75);
+        const iqr = q3 - q1;
+
+        // Use minimum of stdDev and IQR/1.34 (robust estimate)
+        const sigma = Math.min(stdDev, iqr / 1.34);
+
+        // Silverman's rule of thumb: 0.9 * A * n^(-1/5)
+        // where A is the min(stdDev, IQR/1.34)
+        return 0.9 * sigma * Math.pow(data.length, -0.2);
+      }
+
+      // Kernel functions
+      function gaussianKernel(k) {
+        return function (v) {
+          return (
+            ((1 / Math.sqrt(2 * Math.PI)) *
+              Math.exp(-0.5 * Math.pow(v / k, 2))) /
+            k
+          );
+        };
+      }
+
+      function epanechnikovKernel(k) {
+        return function (v) {
+          return Math.abs(v / k) <= 1
+            ? (0.75 * (1 - Math.pow(v / k, 2))) / k
+            : 0;
+        };
+      }
+
+      // Get the selected kernel function
+      function getKernelFunction() {
+        return selectedKernel === 'gaussian'
+          ? gaussianKernel(bandwidth)
+          : epanechnikovKernel(bandwidth);
+      }
+
+      // Calculate KDE values
+      function kde(kernel, thresholds, data) {
+        return thresholds.map((t) => [t, d3.mean(data, (d) => kernel(t - d))]);
+      }
+
+      // Process data and create histogram bins (buckets)
+      function processData(data) {
+        // Calculate optimal number of buckets (square root rule)
+        const bucketCount = Math.ceil(Math.sqrt(data.length));
+
+        // Create histogram buckets with consistent width
+        const minVal = Math.floor(d3.min(data));
+        const maxVal = Math.ceil(d3.max(data));
+        const bucketSize = Math.ceil((maxVal - minVal) / bucketCount);
+
+        // Create thresholds with consistent bucket size
+        const thresholds = [];
+        for (let i = minVal; i <= maxVal; i += bucketSize) {
+          thresholds.push(i);
+        }
+
+        // Create the histogram data
+        const histogram = d3
+          .bin()
+          .domain([minVal, maxVal])
+          .thresholds(thresholds);
+
+        const bins = histogram(data);
+
+        // Generate bucket labels and format bucketed data
+        bucketLabels = [];
+        bucketedData = bins.map((bin) => {
+          const label = `${Math.floor(bin.x0)}-${Math.floor(bin.x1)}`;
+          bucketLabels.push(label);
+          return {
+            label: label,
+            x0: bin.x0,
+            x1: bin.x1,
+            count: bin.length,
+          };
+        });
+
+        // Format bucketed data for display
+        const formattedBuckets = bucketedData
+          .map((bucket) => `[label: "${bucket.label}", count: ${bucket.count}]`)
+          .join('\n');
+
+        bucketedDataPreview.textContent = formattedBuckets;
+
+        // Set data info
+        document.getElementById('dataInfo').textContent = `${
+          data.length
+        } data points (min: ${d3.min(data)}, max: ${d3.max(data)})`;
+
+        return {
+          minVal,
+          maxVal,
+        };
+      }
+
+      // Update KDE info panel
+      function updateKDEInfo() {
+        document.getElementById('optimal-bw').textContent =
+          defaultBandwidth.toFixed(2);
+        document.getElementById('current-bw').textContent =
+          bandwidth.toFixed(2);
+
+        const relativeSmoothing = bandwidth / defaultBandwidth;
+        document.getElementById('relative-smoothing').textContent =
+          relativeSmoothing.toFixed(2) + 'x';
+
+        let assessment;
+        if (relativeSmoothing < 0.6) {
+          assessment = 'Undersmoothed - may show noise as signal';
+        } else if (relativeSmoothing < 0.9) {
+          assessment = 'Slightly undersmoothed - shows fine details';
+        } else if (relativeSmoothing <= 1.1) {
+          assessment = "Optimal smoothing (per Silverman's rule)";
+        } else if (relativeSmoothing <= 2) {
+          assessment = 'Slightly oversmoothed - minor details reduced';
+        } else if (relativeSmoothing <= 4) {
+          assessment = 'Oversmoothed - only shows major features';
+        } else {
+          assessment = 'Highly oversmoothed - may obscure true structure';
+        }
+
+        document.getElementById('smoothness-assessment').textContent =
+          assessment;
+      }
+
+      // Draw Approach 1: KDE mapped to bucket centers
+      function drawApproach1() {
+        // Clear previous chart
+        d3.select('#chart1').html('');
+
+        if (bucketedData.length === 0) return;
+
+        // Set up dimensions and margins
+        const margin = { top: 30, right: 60, bottom: 70, left: 60 };
+        const width =
+          document.getElementById('chart1').clientWidth -
+          margin.left -
+          margin.right;
+        const height = 400 - margin.top - margin.bottom;
+
+        // Create SVG
+        const svg = d3
+          .select('#chart1')
+          .append('svg')
+          .attr('width', width + margin.left + margin.right)
+          .attr('height', height + margin.top + margin.bottom)
+          .append('g')
+          .attr('transform', `translate(${margin.left},${margin.top})`);
+
+        // Create categorical x scale
+        const x = d3
+          .scaleBand()
+          .domain(bucketLabels)
+          .range([0, width])
+          .padding(0.1);
+
+        // Create y scale for histogram
+        const y = d3
+          .scaleLinear()
+          .domain([0, d3.max(bucketedData, (d) => d.count) * 1.1])
+          .nice()
+          .range([height, 0]);
+
+        // Create the proper kernel function based on selection
+        const kernelFunction =
+          selectedKernel === 'gaussian'
+            ? (u) =>
+                (1 / Math.sqrt(2 * Math.PI)) * Math.exp(-0.5 * Math.pow(u, 2))
+            : (u) => (Math.abs(u) <= 1 ? 0.75 * (1 - Math.pow(u, 2)) : 0);
+
+        // Calculate KDE directly for each bucket center
+        const bucketKde = bucketedData.map((bucket) => {
+          const bucketCenter = (bucket.x0 + bucket.x1) / 2;
+
+          // Calculate KDE at this specific bucket center point only
+          const density =
+            rawData.reduce((sum, dataPoint) => {
+              const u = (bucketCenter - dataPoint) / bandwidth;
+              return sum + kernelFunction(u) / bandwidth;
+            }, 0) / rawData.length;
+
+          return {
+            label: bucket.label,
+            x: bucketCenter,
+            density: density,
+          };
+        });
+
+        // Create density scale for KDE
+        const yDensity = d3
+          .scaleLinear()
+          .domain([0, d3.max(bucketKde, (d) => d.density) * 1.1])
+          .nice()
+          .range([height, 0]);
+
+        // Draw histogram bars
+        svg
+          .selectAll('.bar')
+          .data(bucketedData)
+          .enter()
+          .append('rect')
+          .attr('class', 'bar')
+          .attr('x', (d) => x(d.label))
+          .attr('width', x.bandwidth())
+          .attr('y', (d) => y(d.count))
+          .attr('height', (d) => height - y(d.count))
+          .on('mouseover', function (event, d) {
+            tooltip
+              .style('opacity', 1)
+              .html(
+                `<strong>Bucket:</strong> ${d.label}<br><strong>Count:</strong> ${d.count}`
+              )
+              .style('left', event.pageX + 10 + 'px')
+              .style('top', event.pageY - 28 + 'px');
+          })
+          .on('mouseout', () => tooltip.style('opacity', 0));
+
+        // Draw KDE line using ONLY the bucket centers
+        svg
+          .append('path')
+          .datum(bucketKde)
+          .attr('class', 'kde-stepped')
+          .attr(
+            'd',
+            d3
+              .line()
+              .x((d) => x(d.label) + x.bandwidth() / 2)
+              .y((d) => yDensity(d.density))
+              // Use a smoothing curve that passes through each point
+              .curve(d3.curveBasis)
+          )
+          .on('mouseover', function (event, d) {
+            // Find closest point to mouse
+            const [xPos] = d3.pointer(event);
+            const index = d3.bisectCenter(
+              d.map((p) => x(p.label) + x.bandwidth() / 2),
+              xPos
+            );
+            const point = d[index];
+
+            tooltip
+              .style('opacity', 1)
+              .html(
+                `<strong>Bucket:</strong> ${
+                  point.label
+                }<br><strong>Density:</strong> ${(point.density * 100).toFixed(
+                  2
+                )}%`
+              )
+              .style('left', event.pageX + 10 + 'px')
+              .style('top', event.pageY - 28 + 'px');
+          })
+          .on('mouseout', () => tooltip.style('opacity', 0));
+
+        // Draw axes
+        svg
+          .append('g')
+          .attr('class', 'axis')
+          .attr('transform', `translate(0,${height})`)
+          .call(d3.axisBottom(x))
+          .selectAll('text')
+          .style('text-anchor', 'end')
+          .attr('dx', '-.8em')
+          .attr('dy', '.15em')
+          .attr('transform', 'rotate(-45)');
+
+        svg.append('g').attr('class', 'axis').call(d3.axisLeft(y));
+
+        svg
+          .append('g')
+          .attr('class', 'axis')
+          .attr('transform', `translate(${width},0)`)
+          .call(
+            d3.axisRight(yDensity).tickFormat((d) => (d * 100).toFixed(2) + '%')
+          );
+
+        // Add axis labels
+        svg
+          .append('text')
+          .attr(
+            'transform',
+            `translate(${width / 2},${height + margin.bottom - 10})`
+          )
+          .style('text-anchor', 'middle')
+          .text('Value Buckets');
+
+        svg
+          .append('text')
+          .attr('transform', 'rotate(-90)')
+          .attr('y', -margin.left + 15)
+          .attr('x', -(height / 2))
+          .style('text-anchor', 'middle')
+          .text('Count');
+
+        svg
+          .append('text')
+          .attr('transform', 'rotate(-90)')
+          .attr('y', width + margin.right - 15)
+          .attr('x', -(height / 2))
+          .style('text-anchor', 'middle')
+          .style('fill', 'var(--kde-color-approach1)')
+          .text('Density');
+
+        // Populate the data table
+        populateDataTable('data-table-1', bucketedData, bucketKde);
+      }
+
+      // Draw Approach 2: True KDE with same number of points as histogram buckets
+      function drawApproach2() {
+        // Clear previous chart
+        d3.select('#chart2').html('');
+
+        if (bucketedData.length === 0) return;
+
+        // Set up dimensions and margins
+        const margin = { top: 30, right: 60, bottom: 70, left: 60 };
+        const width =
+          document.getElementById('chart2').clientWidth -
+          margin.left -
+          margin.right;
+        const height = 400 - margin.top - margin.bottom;
+
+        // Create SVG
+        const svg = d3
+          .select('#chart2')
+          .append('svg')
+          .attr('width', width + margin.left + margin.right)
+          .attr('height', height + margin.top + margin.bottom)
+          .append('g')
+          .attr('transform', `translate(${margin.left},${margin.top})`);
+
+        // Create categorical x scale for histogram
+        const x = d3
+          .scaleBand()
+          .domain(bucketLabels)
+          .range([0, width])
+          .padding(0.1);
+
+        // Create continuous x scale for KDE that directly maps to the bucket boundaries
+        const xContinuous = d3
+          .scaleLinear()
+          .domain([
+            d3.min(bucketedData, (d) => d.x0),
+            d3.max(bucketedData, (d) => d.x1),
+          ])
+          .range([0, width]);
+
+        // Create y scale for histogram
+        const y = d3
+          .scaleLinear()
+          .domain([0, d3.max(bucketedData, (d) => d.count) * 1.1])
+          .nice()
+          .range([height, 0]);
+
+        // Create proper kernel functions that respect bandwidth
+        const kernelFunction =
+          selectedKernel === 'gaussian'
+            ? (u) =>
+                (1 / Math.sqrt(2 * Math.PI)) * Math.exp(-0.5 * Math.pow(u, 2))
+            : (u) => (Math.abs(u) <= 1 ? 0.75 * (1 - Math.pow(u, 2)) : 0);
+
+        // Calculate KDE directly for ONLY the bucket centers, just like in Approach 1
+        // But use a different normalization approach to highlight the difference
+        // This approach renormalizes the KDE to ensure its integration gives 1
+        const bucketKdeValues = bucketedData.map((bucket) => {
+          const bucketCenter = (bucket.x0 + bucket.x1) / 2;
+
+          // Calculate KDE at this specific bucket center point only
+          const density =
+            rawData.reduce((sum, dataPoint) => {
+              const u = (bucketCenter - dataPoint) / bandwidth;
+              return sum + kernelFunction(u) / bandwidth;
+            }, 0) / rawData.length;
+
+          return {
+            label: bucket.label,
+            x: bucketCenter,
+            density: density,
+          };
+        });
+
+        // Apply post-processing to the KDE values (a true difference between approaches)
+        // Approach 2 ensures KDE is normalized properly
+        // Calculate area under the KDE curve (approximate using trapezoid rule)
+        const totalArea = bucketKdeValues.reduce((sum, point, i, arr) => {
+          if (i === 0) return 0;
+          const prev = arr[i - 1];
+          const width = point.x - prev.x;
+          const height = (point.density + prev.density) / 2;
+          return sum + width * height;
+        }, 0);
+
+        // Normalize to ensure area under curve is approximately 1
+        const normalizedKdeValues = bucketKdeValues.map((point) => ({
+          ...point,
+          density: point.density / totalArea,
+        }));
+
+        // Create density scale for KDE
+        const yDensity = d3
+          .scaleLinear()
+          .domain([0, d3.max(normalizedKdeValues, (d) => d.density) * 1.1])
+          .nice()
+          .range([height, 0]);
+
+        // Draw histogram bars
+        svg
+          .selectAll('.bar')
+          .data(bucketedData)
+          .enter()
+          .append('rect')
+          .attr('class', 'bar')
+          .attr('x', (d) => x(d.label))
+          .attr('width', x.bandwidth())
+          .attr('y', (d) => y(d.count))
+          .attr('height', (d) => height - y(d.count))
+          .on('mouseover', function (event, d) {
+            tooltip
+              .style('opacity', 1)
+              .html(
+                `<strong>Bucket:</strong> ${d.label}<br><strong>Count:</strong> ${d.count}`
+              )
+              .style('left', event.pageX + 10 + 'px')
+              .style('top', event.pageY - 28 + 'px');
+          })
+          .on('mouseout', () => tooltip.style('opacity', 0));
+
+        // Draw KDE line using a continuous scale for the x-axis instead of categorical
+        svg
+          .append('path')
+          .datum(normalizedKdeValues)
+          .attr('class', 'kde')
+          .attr(
+            'd',
+            d3
+              .line()
+              .x((d) => xContinuous(d.x)) // Use continuous x scale
+              .y((d) => yDensity(d.density))
+              // Use a different curve type from Approach 1 for visual distinction
+              .curve(d3.curveCardinal.tension(0.5))
+          )
+          .on('mouseover', function (event, d) {
+            const [xPos] = d3.pointer(event);
+            const x0 = xContinuous.invert(xPos);
+            const index = d3.bisector((d) => d.x).left(d, x0);
+            const point = d[index];
+
+            if (point) {
+              tooltip
+                .style('opacity', 1)
+                .html(
+                  `<strong>Position:</strong> ${point.x.toFixed(
+                    1
+                  )}<br><strong>Density:</strong> ${(
+                    point.density * 100
+                  ).toFixed(2)}%`
+                )
+                .style('left', event.pageX + 10 + 'px')
+                .style('top', event.pageY - 28 + 'px');
+            }
+          })
+          .on('mouseout', () => tooltip.style('opacity', 0));
+
+        // Draw axes
+        svg
+          .append('g')
+          .attr('class', 'axis')
+          .attr('transform', `translate(0,${height})`)
+          .call(d3.axisBottom(x))
+          .selectAll('text')
+          .style('text-anchor', 'end')
+          .attr('dx', '-.8em')
+          .attr('dy', '.15em')
+          .attr('transform', 'rotate(-45)');
+
+        svg.append('g').attr('class', 'axis').call(d3.axisLeft(y));
+
+        svg
+          .append('g')
+          .attr('class', 'axis')
+          .attr('transform', `translate(${width},0)`)
+          .call(
+            d3.axisRight(yDensity).tickFormat((d) => (d * 100).toFixed(2) + '%')
+          );
+
+        // Add axis labels
+        svg
+          .append('text')
+          .attr(
+            'transform',
+            `translate(${width / 2},${height + margin.bottom - 10})`
+          )
+          .style('text-anchor', 'middle')
+          .text('Value Buckets');
+
+        svg
+          .append('text')
+          .attr('transform', 'rotate(-90)')
+          .attr('y', -margin.left + 15)
+          .attr('x', -(height / 2))
+          .style('text-anchor', 'middle')
+          .text('Count');
+
+        svg
+          .append('text')
+          .attr('transform', 'rotate(-90)')
+          .attr('y', width + margin.right - 15)
+          .attr('x', -(height / 2))
+          .style('text-anchor', 'middle')
+          .style('fill', 'var(--kde-color-approach2)')
+          .text('Density');
+
+        // Populate the data table
+        populateDataTable('data-table-2', bucketedData, normalizedKdeValues);
+      }
+
+      // Generate sample data with different distribution types
+      function generateSampleData() {
+        const data = [];
+        const distributionTypes = [
+          'unimodal',
+          'bimodal',
+          'multimodal',
+          'skewed',
+        ];
+        const selectedType =
+          distributionTypes[
+            Math.floor(Math.random() * distributionTypes.length)
+          ];
+
+        switch (selectedType) {
+          case 'unimodal':
+            // Single normal distribution
+            const mean = Math.random() * 1000 + 4000; // Mean between 4000-5000
+            const stdDev = Math.random() * 150 + 100; // StdDev between 100-250
+
+            for (let i = 0; i < 500; i++) {
+              data.push(Math.round(d3.randomNormal(mean, stdDev)()));
+            }
+            break;
+
+          case 'bimodal':
+            // Two peaks with different heights
+            const mean1 = 4000 + Math.random() * 300;
+            const mean2 = 4800 + Math.random() * 400;
+            const std1 = Math.random() * 100 + 80;
+            const std2 = Math.random() * 100 + 80;
+
+            // Potentially different counts for each mode
+            const count1 = Math.floor(Math.random() * 200) + 300; // 300-500
+            const count2 = Math.floor(Math.random() * 200) + 300; // 300-500
+
+            for (let i = 0; i < count1; i++) {
+              data.push(Math.round(d3.randomNormal(mean1, std1)()));
+            }
+
+            for (let i = 0; i < count2; i++) {
+              data.push(Math.round(d3.randomNormal(mean2, std2)()));
+            }
+            break;
+
+          case 'multimodal':
+            // Three distinct peaks
+            const peaks = 3;
+            const baseVal = 4000;
+
+            for (let p = 0; p < peaks; p++) {
+              const peakMean = baseVal + p * 500 + Math.random() * 200;
+              const peakStd = 80 + Math.random() * 60;
+              const peakCount = 150 + Math.floor(Math.random() * 100);
+
+              for (let i = 0; i < peakCount; i++) {
+                data.push(Math.round(d3.randomNormal(peakMean, peakStd)()));
+              }
+            }
+            break;
+
+          case 'skewed':
+            // Create a skewed distribution using gamma or beta + transformation
+            // Log-normal can create right-skewed distributions
+            const mu = Math.log(4500);
+            const sigma = 0.3 + Math.random() * 0.3; // Controls skewness
+
+            for (let i = 0; i < 500; i++) {
+              // Using log-normal distribution for skewed data
+              const value = Math.exp(d3.randomNormal(mu, sigma)());
+              data.push(Math.round(value));
+            }
+            break;
+        }
+
+        // Update textarea with the generated data
+        dataInput.value = JSON.stringify(data);
+
+        // Show what type of distribution was generated
+        const toast = document.createElement('div');
+        toast.id = 'toast';
+        toast.textContent = `Generated ${selectedType} distribution`;
+        document.body.appendChild(toast);
+
+        // Show and auto-hide toast
+        setTimeout(() => {
+          toast.className = 'show';
+          setTimeout(() => {
+            toast.className = toast.className.replace('show', '');
+            setTimeout(() => {
+              document.body.removeChild(toast);
+            }, 500);
+          }, 3000);
+        }, 100);
+
+        // Update charts
+        updateCharts();
+      }
+
+      // Update charts with current data and settings
+      function updateCharts() {
+        try {
+          // Validate and parse input data
+          const input = dataInput.value.trim();
+          if (!input) {
+            throw new Error('Please enter data in JSON array format.');
+          }
+
+          try {
+            rawData = JSON.parse(input);
+          } catch (e) {
+            throw new Error(
+              'Invalid JSON format. Please provide a valid array of numbers.'
+            );
+          }
+
+          if (!Array.isArray(rawData) || rawData.length < 2) {
+            throw new Error('Please provide an array with at least 2 numbers.');
+          }
+
+          if (rawData.some((d) => typeof d !== 'number')) {
+            throw new Error('All values must be numbers.');
+          }
+
+          // Process data to create buckets
+          processData(rawData);
+
+          // Calculate optimal bandwidth using Silverman's rule
+          defaultBandwidth = calculateSilvermanBandwidth(rawData);
+
+          // Update slider range based on new optimal bandwidth
+          const minBandwidth = Math.max(0.1, defaultBandwidth * 0.1).toFixed(1);
+          const maxBandwidth = (defaultBandwidth * 5).toFixed(1);
+          bandwidthSlider.min = minBandwidth;
+          bandwidthSlider.max = maxBandwidth;
+
+          // Important: Reset bandwidth to optimal value when data changes
+          bandwidth = defaultBandwidth;
+          bandwidthSlider.value = bandwidth;
+          bandwidthValue.textContent = bandwidth.toFixed(1);
+
+          // Draw both charts
+          drawApproach1();
+          drawApproach2();
+
+          // Update KDE info panel
+          updateKDEInfo();
+
+          // Hide error if present
+          errorMessage.style.display = 'none';
+        } catch (error) {
+          // Show error message
+          errorMessage.textContent = error.message;
+          errorMessage.style.display = 'block';
+        }
+      }
+
+      // Generate sample data (bimodal distribution)
+      function generateSampleData() {
+        const data = [];
+
+        // First peak around 4500
+        for (let i = 0; i < 500; i++) {
+          data.push(Math.round(d3.randomNormal(4500, 150)()));
+        }
+
+        // Second peak around 5200
+        for (let i = 0; i < 500; i++) {
+          data.push(Math.round(d3.randomNormal(5200, 180)()));
+        }
+
+        // Update textarea with the generated data
+        dataInput.value = JSON.stringify(data);
+
+        // Update charts
+        updateCharts();
+      }
+
+      // Function to populate the data tables with histogram and KDE values
+      function populateDataTable(tableId, histogramData, kdeData) {
+        const tableBody = document
+          .getElementById(tableId)
+          .querySelector('tbody');
+        tableBody.innerHTML = ''; // Clear existing rows
+
+        histogramData.forEach((bucket, i) => {
+          const row = document.createElement('tr');
+
+          // Bucket label cell
+          const bucketCell = document.createElement('td');
+          bucketCell.textContent = bucket.label;
+          row.appendChild(bucketCell);
+
+          // Count cell
+          const countCell = document.createElement('td');
+          countCell.textContent = bucket.count;
+          row.appendChild(countCell);
+
+          // KDE value cell
+          const kdeCell = document.createElement('td');
+          // Format the KDE value as percentage with 4 decimal places
+          kdeCell.textContent = (kdeData[i].density * 100).toFixed(4) + '%';
+          row.appendChild(kdeCell);
+
+          tableBody.appendChild(row);
+        });
+      }
+
+      // Generate sample data with different distribution types
+      function generateSampleData() {
+        const data = [];
+        const distributionTypes = [
+          'unimodal',
+          'bimodal',
+          'multimodal',
+          'skewed',
+        ];
+        const selectedType =
+          distributionTypes[
+            Math.floor(Math.random() * distributionTypes.length)
+          ];
+
+        switch (selectedType) {
+          case 'unimodal':
+            // Single normal distribution
+            const mean = Math.random() * 1000 + 4000; // Mean between 4000-5000
+            const stdDev = Math.random() * 150 + 100; // StdDev between 100-250
+
+            for (let i = 0; i < 500; i++) {
+              data.push(Math.round(d3.randomNormal(mean, stdDev)()));
+            }
+            break;
+
+          case 'bimodal':
+            // Two peaks with different heights
+            const mean1 = 4000 + Math.random() * 300;
+            const mean2 = 4800 + Math.random() * 400;
+            const std1 = Math.random() * 100 + 80;
+            const std2 = Math.random() * 100 + 80;
+
+            // Potentially different counts for each mode
+            const count1 = Math.floor(Math.random() * 200) + 300; // 300-500
+            const count2 = Math.floor(Math.random() * 200) + 300; // 300-500
+
+            for (let i = 0; i < count1; i++) {
+              data.push(Math.round(d3.randomNormal(mean1, std1)()));
+            }
+
+            for (let i = 0; i < count2; i++) {
+              data.push(Math.round(d3.randomNormal(mean2, std2)()));
+            }
+            break;
+
+          case 'multimodal':
+            // Three distinct peaks
+            const peaks = 3;
+            const baseVal = 4000;
+
+            for (let p = 0; p < peaks; p++) {
+              const peakMean = baseVal + p * 500 + Math.random() * 200;
+              const peakStd = 80 + Math.random() * 60;
+              const peakCount = 150 + Math.floor(Math.random() * 100);
+
+              for (let i = 0; i < peakCount; i++) {
+                data.push(Math.round(d3.randomNormal(peakMean, peakStd)()));
+              }
+            }
+            break;
+
+          case 'skewed':
+            // Create a skewed distribution using gamma or beta + transformation
+            // Log-normal can create right-skewed distributions
+            const mu = Math.log(4500);
+            const sigma = 0.3 + Math.random() * 0.3; // Controls skewness
+
+            for (let i = 0; i < 500; i++) {
+              // Using log-normal distribution for skewed data
+              const value = Math.exp(d3.randomNormal(mu, sigma)());
+              data.push(Math.round(value));
+            }
+            break;
+        }
+
+        // Update textarea with the generated data
+        dataInput.value = JSON.stringify(data);
+
+        // Show what type of distribution was generated
+        const toast = document.createElement('div');
+        toast.id = 'toast';
+        toast.textContent = `Generated ${selectedType} distribution`;
+        document.body.appendChild(toast);
+
+        // Show and auto-hide toast
+        setTimeout(() => {
+          toast.className = 'show';
+          setTimeout(() => {
+            toast.className = toast.className.replace('show', '');
+            setTimeout(() => {
+              document.body.removeChild(toast);
+            }, 500);
+          }, 3000);
+        }, 100);
+
+        // Update charts
+        updateCharts();
+      }
+
+      // Update kernel selection
+      document
+        .getElementById('kernelToggle')
+        .addEventListener('change', function () {
+          selectedKernel = this.checked ? 'epanechnikov' : 'gaussian';
+
+          // Update toggle labels highlighting
+          const gaussianLabel = document.getElementById('gaussianLabel');
+          const epanechnikovLabel =
+            document.getElementById('epanechnikovLabel');
+
+          if (this.checked) {
+            gaussianLabel.classList.remove('active');
+            epanechnikovLabel.classList.add('active');
+          } else {
+            gaussianLabel.classList.add('active');
+            epanechnikovLabel.classList.remove('active');
+          }
+
+          // Redraw if we have data
+          if (rawData.length > 0) {
+            drawApproach1();
+            drawApproach2();
+          }
+        });
+
+      // Theme toggle functionality
+      const themeToggle = document.getElementById('themeToggle');
+      const themeIcon = document.getElementById('themeIcon');
+
+      // Check for saved theme preference or default to light mode
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'dark') {
+        document.body.classList.add('dark-mode');
+        themeIcon.textContent = '☀️';
+      }
+
+      // Theme toggle click handler
+      themeToggle.addEventListener('click', () => {
+        document.body.classList.toggle('dark-mode');
+        const isDarkMode = document.body.classList.contains('dark-mode');
+
+        // Update icon
+        themeIcon.textContent = isDarkMode ? '☀️' : '🌙';
+
+        // Save preference to localStorage
+        localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+
+        // Redraw charts with new theme colors if data exists
+        if (rawData.length > 0) {
+          drawApproach1();
+          drawApproach2();
+        }
+      });
+
+      // Generate random sample data on page load
+      generateSampleData();
+
+      // Event listeners
+      bandwidthSlider.addEventListener('input', function () {
+        bandwidth = parseFloat(this.value);
+        bandwidthValue.textContent = bandwidth.toFixed(1);
+
+        // Update charts
+        if (rawData.length > 0) {
+          drawApproach1();
+          drawApproach2();
+          updateKDEInfo();
+        }
+      });
+
+      // Update button click handler
+      updateButton.addEventListener('click', updateCharts);
+
+      // Generate data button click handler
+      generateButton.addEventListener('click', generateSampleData);
+
+      // Initial label highlighting for kernel toggle
+      document.getElementById('gaussianLabel').classList.add('active');
+
+      // Generate random sample data on page load
+      generateSampleData();
+    </script>
+  </body>
+</html>

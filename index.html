@@ -89,7 +89,7 @@
         gap: 16px;
       }
 
-      .dark-mode-toggle {
+      .dark-mode-toggle, .theme-toggle {
         background: none;
         border: none;
         font-size: 24px;
@@ -97,7 +97,7 @@
         transition: transform 0.3s ease;
       }
 
-      .dark-mode-toggle:hover {
+      .dark-mode-toggle:hover, .theme-toggle:hover {
         transform: rotate(30deg);
       }
 
@@ -107,14 +107,23 @@
       }
 
       .nav-link {
-        color: var(--accent-color);
+        color: white;
+        background-color: var(--accent-color);
         text-decoration: none;
-        transition: color 0.3s;
+        border-radius: 6px;
+        padding: 8px 16px;
         font-weight: 500;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       }
 
       .nav-link:hover {
-        color: var(--secondary-accent);
+        background-color: var(--button-hover);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
       }
 
       .main-content {
@@ -588,6 +597,7 @@
       <header>
         <h1 class="app-title">Kernel Density Estimation Explorer</h1>
         <div class="header-controls">
+          <a href="kde2.html" class="nav-link">Category Axis Implementation →</a>
           <button
             id="darkModeToggle"
             class="dark-mode-toggle"
