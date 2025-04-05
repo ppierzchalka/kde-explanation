@@ -89,16 +89,30 @@
         gap: 16px;
       }
 
-      .dark-mode-toggle, .theme-toggle {
+      /* Theme toggle styling from kde2.html */
+      .theme-toggle {
         background: none;
         border: none;
-        font-size: 24px;
         cursor: pointer;
-        transition: transform 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        padding: 8px;
+        border-radius: 50%;
+        color: var(--text-color);
+        background-color: rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
       }
 
-      .dark-mode-toggle:hover, .theme-toggle:hover {
-        transform: rotate(30deg);
+      .dark-mode .theme-toggle {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .theme-toggle:hover {
+        background-color: var(--accent-color);
+        color: white;
+        transform: rotate(20deg);
       }
 
       .nav-links {
@@ -599,11 +613,11 @@
         <div class="header-controls">
           <a href="kde2.html" class="nav-link">Category Axis Implementation →</a>
           <button
-            id="darkModeToggle"
-            class="dark-mode-toggle"
-            title="Toggle dark/light mode"
+            id="themeToggle"
+            class="theme-toggle"
+            title="Toggle dark mode"
           >
-            🔆
+            <span id="themeIcon">🌙</span>
           </button>
         </div>
       </header>
@@ -1959,16 +1973,16 @@
       /**
        * Toggle dark/light mode
        */
-      function toggleDarkMode() {
+      function toggleTheme() {
         const body = document.body;
         const isDarkMode = body.classList.toggle('dark-mode');
+        const themeIcon = document.getElementById('themeIcon');
 
-        // Update the toggle button icon
-        const darkModeToggle = document.getElementById('darkModeToggle');
-        darkModeToggle.textContent = isDarkMode ? '🌙' : '🔆';
+        // Update the theme icon
+        themeIcon.textContent = isDarkMode ? '☀️' : '🌙';
 
         // Save preference to localStorage
-        localStorage.setItem('darkMode', isDarkMode ? 'enabled' : 'disabled');
+        localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
 
         // Redraw the chart if data exists
         if (rawData.length > 0) {
@@ -1976,9 +1990,7 @@
         }
       }
 
-      /**
-       * Initialize MathJax for rendering LaTeX
-       */
+      // Initialize MathJax for rendering LaTeX
       function initMathJax() {
         if (window.MathJax) {
           // Configure MathJax
@@ -2051,22 +2063,21 @@
             updateKDEPropertiesCard();
           });
 
-        // Set up dark mode toggle
-        const darkModeToggle = document.getElementById('darkModeToggle');
-        const prefersDarkMode = window.matchMedia(
-          '(prefers-color-scheme: dark)'
-        ).matches;
+        // Set up theme toggle
+        const themeToggle = document.getElementById('themeToggle');
+        const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const themeIcon = document.getElementById('themeIcon');
 
         // Check for saved preference or use system preference
         const savedTheme = localStorage.getItem('theme');
         if (savedTheme === 'dark' || (savedTheme === null && prefersDarkMode)) {
           document.body.classList.add('dark-mode');
-          darkModeToggle.textContent = '🌙';
+          themeIcon.textContent = '☀️';
         } else {
-          darkModeToggle.textContent = '🔆';
+          themeIcon.textContent = '🌙';
         }
 
-        darkModeToggle.addEventListener('click', toggleDarkMode);
+        themeToggle.addEventListener('click', toggleTheme);
 
         // Initialize MathJax for formula rendering
         initMathJax();
