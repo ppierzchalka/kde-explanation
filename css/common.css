@@ -1,0 +1,437 @@
+/* Common CSS for KDE HTML files */
+
+:root {
+  --background-color: #f9f9fb;
+  --text-color: #2b2d42;
+  --card-bg: #ffffff;
+  --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --accent-color: #4361ee;
+  --secondary-accent: #3f37c9;
+  --border-color: #e0e0e0;
+  --chart-grid: #e9ecef;
+  --histogram-color: #4361ee;
+  --kde-color: #ef476f;
+  --kde-fill: rgba(239, 71, 111, 0.2);
+  /* Approach-specific colors */
+  --kde-color-approach1: #ef476f;
+  --kde-color-approach2: #06d6a0;
+  --kde-fill-approach1: rgba(239, 71, 111, 0.2);
+  --kde-fill-approach2: rgba(6, 214, 160, 0.2);
+  --input-bg: #ffffff;
+  --button-hover: #3a56d4;
+  --card-radius: 12px;
+  --success-color: #06d6a0;
+  --error-color: #d90429;
+  --warning-color: #ffd166;
+}
+
+/* Dark Mode Variables */
+.dark-mode {
+  --background-color: #1a1b25;
+  --text-color: #f8f9fa;
+  --card-bg: #2b2d42;
+  --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.24);
+  --accent-color: #4895ef;
+  --secondary-accent: #4cc9f0;
+  --border-color: #4b4b6a;
+  --chart-grid: #3c3d54;
+  --histogram-color: #4895ef;
+  --kde-color: #ff5e78;
+  --kde-fill: rgba(255, 94, 120, 0.2);
+  /* Approach-specific colors for dark mode */
+  --kde-color-approach1: #ff5e78;
+  --kde-color-approach2: #0cce9e;
+  --kde-fill-approach1: rgba(255, 94, 120, 0.2);
+  --kde-fill-approach2: rgba(12, 206, 158, 0.2);
+  --input-bg: #242535;
+  --button-hover: #3a75b0;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  line-height: 1.6;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Page container for proper centering and margins */
+.page-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.container {
+  max-width: 1600px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 40px;
+  box-sizing: border-box;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 16px;
+}
+
+.app-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--accent-color);
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+h1, h2, h3 {
+  color: var(--accent-color);
+  margin-top: 0;
+}
+
+h1 {
+  font-size: 28px;
+  margin-bottom: 24px;
+}
+
+h2 {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+h3 {
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.control-row {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  gap: 24px;
+}
+
+.input-group {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+label {
+  font-weight: 500;
+  display: block;
+  margin-bottom: 8px;
+}
+
+textarea, input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  font-family: monospace;
+  font-size: 14px;
+  transition: border-color 0.3s;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+textarea:focus, input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.data-button {
+  padding: 10px 16px;
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.data-button:hover {
+  background-color: var(--button-hover);
+}
+
+.slider-container {
+  flex-grow: 1;
+}
+
+.slider-with-value {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slider-value {
+  font-family: monospace;
+  min-width: 40px;
+  text-align: right;
+}
+
+input[type='range'] {
+  width: 100%;
+}
+
+/* Theme toggle styling */
+.theme-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  padding: 8px;
+  border-radius: 50%;
+  color: var(--text-color);
+  background-color: rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.dark-mode .theme-toggle {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.theme-toggle:hover {
+  background-color: var(--accent-color);
+  color: white;
+  transform: rotate(20deg);
+}
+
+/* Kernel toggle styling */
+.kernel-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  justify-content: center;
+}
+
+.kernel-toggle {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 28px;
+  margin: 0 10px;
+}
+
+.kernel-toggle-checkbox {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.kernel-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--accent-color);
+  transition: 0.4s;
+  border-radius: 34px;
+}
+
+.kernel-toggle-slider:before {
+  position: absolute;
+  content: '';
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+.kernel-toggle-checkbox:checked + .kernel-toggle-slider {
+  background-color: var(--kde-color);
+}
+
+.kernel-toggle-checkbox:checked + .kernel-toggle-slider:before {
+  transform: translateX(32px);
+}
+
+/* Error message styling */
+.error-message {
+  background-color: var(--error-color);
+  color: white;
+  padding: 10px 16px;
+  border-radius: 6px;
+  margin-top: 16px;
+  display: none;
+  font-weight: 500;
+  animation: fadeIn 0.3s;
+}
+
+/* Tooltip styling */
+.tooltip {
+  position: absolute;
+  background-color: var(--card-bg);
+  border-radius: 4px;
+  padding: 10px;
+  font-size: 14px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  box-shadow: var(--card-shadow);
+}
+
+/* Chart styling */
+.chart {
+  width: 100%;
+  height: 400px;
+  margin-top: 16px;
+}
+
+.axis path, .axis line {
+  stroke: var(--border-color);
+}
+
+.axis text {
+  font-size: 12px;
+  fill: var(--text-color);
+}
+
+.bar {
+  fill: var(--histogram-color);
+  opacity: 0.7;
+}
+
+/* Legend styling */
+.legend {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  margin-top: 20px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Toast notifications */
+#toast {
+  visibility: hidden;
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--card-bg);
+  color: var(--text-color);
+  border-left: 4px solid var(--accent-color);
+  padding: 16px 24px;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+}
+
+#toast.show {
+  visibility: visible;
+  animation: fadein 0.5s, fadeout 0.5s 2.5s;
+}
+
+@keyframes fadein {
+  from {
+    bottom: 0;
+    opacity: 0;
+  }
+  to {
+    bottom: 30px;
+    opacity: 1;
+  }
+}
+
+@keyframes fadeout {
+  from {
+    bottom: 30px;
+    opacity: 1;
+  }
+  to {
+    bottom: 0;
+    opacity: 0;
+  }
+}
+
+/* Navigation links */
+.nav-link {
+  color: white;
+  background-color: var(--accent-color);
+  text-decoration: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-link:hover {
+  background-color: var(--button-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Add styling for MathJax formulas */
+.mjx-chtml {
+  margin: 10px 0;
+  font-size: 110% !important;
+}
+
+/* Media queries for responsive design */
+@media (max-width: 1200px) {
+  .chart-container {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 1100px) {
+  .main-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Footer styling */
+footer {
+  margin-top: 40px;
+  padding: 20px 0;
+  text-align: center;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-color);
+  opacity: 0.8;
+  transition: opacity 0.3s;
+}
+
+footer:hover {
+  opacity: 1;
+}
